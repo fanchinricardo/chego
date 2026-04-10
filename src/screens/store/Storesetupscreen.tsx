@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { colors, Input, Button, StepBar, Toast } from "../../components/ui";
-import { geocodeAddress } from "../../services/routing";
 
 interface StoreGroup {
   id: string;
@@ -120,8 +119,6 @@ export default function StoreSetupScreen() {
     setSaving(true);
 
     try {
-      // Geocodifica o endereço da loja
-      const fullAddress = `${form.address.trim()}, ${form.city.trim()} - ${form.state.trim()}, ${form.zip_code.replace(/\D/g, "")}, Brasil`;
       let lat: number | null = null;
       let lng: number | null = null;
 
@@ -151,8 +148,6 @@ export default function StoreSetupScreen() {
         city: form.city.trim(),
         state: form.state.trim().toUpperCase().slice(0, 2),
         zip_code: form.zip_code.replace(/\D/g, ""),
-        lat,
-        lng,
         delivery_fee: Number(form.delivery_fee) || 0,
         min_order_value: Number(form.min_order_value) || 0,
         estimated_time: Number(form.estimated_time) || 45,
