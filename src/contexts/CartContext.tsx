@@ -5,6 +5,7 @@ import {
   useEffect,
   ReactNode,
 } from "react";
+import { supabase } from "../lib/supabase";
 
 export interface CartItem {
   product_id: string;
@@ -29,7 +30,7 @@ interface CartContextType {
   removeItem: (productId: string) => void;
   updateQty: (productId: string, qty: number) => void;
   updateNotes: (productId: string, notes: string) => void;
-  clearCart: () => void;
+  clearCart: (cancelPendingOrder?: boolean) => void;
   canAddFrom: (storeId: string) => boolean;
 }
 
@@ -128,7 +129,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  function clearCart() {
+  async function clearCart(cancelPendingOrder = true) {
+    // Cancela pedido pending no banco se existir
+    if (cancelPendingOrder && storeId) {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          await supabase
+            .from("orders")
+            .update({ status: "cancelled", payment_status: "cancelled" })
+            .eq("customer_id", user.id)
+            .eq("store_id", storeId)
+            .eq("status", "pending")
+            .eq("payment_status", "pending");
+        }
+      } catch (e) {
+        console.warn("Erro ao cancelar pedido pending:", e);
+      }
+    }
     setItems([]);
     setStoreId(null);
     setStoreName(null);
