@@ -1,0 +1,408 @@
+[1mdiff --git a/src/App.tsx b/src/App.tsx[m
+[1mindex c34cc20..05210de 100644[m
+[1m--- a/src/App.tsx[m
+[1m+++ b/src/App.tsx[m
+[36m@@ -17,154 +17,389 @@[m [mimport RecoverPasswordScreen from "./screens/RecoverPasswordScreen";[m
+ [m
+ // Comércio[m
+ import StoreDashboard from "./screens/store/StoreDashboard";[m
+[31m-import OrderDetailScreen from "./screens/store/Orderdetailscreen";[m
+[32m+[m[32mimport OrderDetailScreen from "./screens/store/OrderDetailScreen";[m
+ import ProductsScreen from "./screens/store/ProductsScreen";[m
+[31m-import StoreProfileScreen from "./screens/store/Storeprofilescreen";[m
+[32m+[m[32mimport StoreProfileScreen from "./screens/store/StoreProfileScreen";[m
+ import StoreSetupScreen from "./screens/store/Storesetupscreen";[m
+[31m-import StoreMpConfigScreen from "./screens/store/Storempconfigscreen";[m
+[32m+[m[32mimport StoreMpConfigScreen from "./screens/store/StoreMpConfigScreen";[m
+[32m+[m[32mimport StoreMotoboyScreen from "./screens/store/StoreMotoboyScreen";[m
+ import StoreScheduleScreen from "./screens/store/StoreScheduleScreen";[m
+[31m-import StoreMotoboyScreen from "./screens/store/Storemotoboyscreen";[m
+ import RouteBuilderScreen from "./screens/store/RouteBuilderScreen";[m
+[31m-import RouteConfirmScreen from "./screens/store/Routeconfirmscreen";[m
+[31m-import RouteScreen, { RouteLiveScreen } from "./screens/store/Routescreen";[m
+[32m+[m[32mimport RouteConfirmScreen from "./screens/store/RouteConfirmScreen";[m
+[32m+[m[32mimport RouteScreen,{ RouteLiveScreen } from "./screens/store/RouteScreen";[m
+ [m
+ // Cliente[m
+[31m-import CustomerHomeScreen from "./screens/customer/Customerhomescreen";[m
+[31m-import CustomerStoreScreen from "./screens/customer/Customerstorescreen";[m
+[31m-import CustomerProfileScreen from "./screens/customer/Customerprofilescreen";[m
+[32m+[m[32mimport CustomerHomeScreen from "./screens/customer/CustomerHomeScreen";[m
+[32m+[m[32mimport CustomerStoreScreen from "./screens/customer/CustomerStoreScreen";[m
+[32m+[m[32mimport CustomerProfileScreen from "./screens/customer/CustomerProfileScreen";[m
+ import {[m
+   CartScreen,[m
+   PaymentScreen,[m
+[31m-} from "./screens/customer/Cartandpaymentscreen";[m
+[32m+[m[32m} from "./screens/customer/CartAndPaymentScreen";[m
+ import {[m
+   CustomerOrdersScreen,[m
+   CustomerTrackingScreen,[m
+[31m-} from "./screens/customer/Customerordersscreen";[m
+[32m+[m[32m} from "./screens/customer/CustomerOrdersScreen";[m
+ [m
+ // Motoboy[m
+ import MotoboyHomeScreen from "./screens/motoboy/MotoboyHomeScreen";[m
+[31m-import MotoboyRouteScreen from "./screens/motoboy/Motoboyroutescreen";[m
+[31m-import MotoboyDeliveryScreen from "./screens/motoboy/Motoboydeliveryscreen";[m
+[32m+[m[32mimport MotoboyRouteScreen from "./screens/motoboy/MotoboyRouteScreen";[m
+[32m+[m[32mimport MotoboyDeliveryScreen from "./screens/motoboy/MotoboyDeliveryScreen";[m
+ const AdminScreen = () => <Placeholder label="⚙️  Painel Admin" />;[m
+ [m
+ function Placeholder({ label }: { label: string }) {[m
+[31m-  const { signOut } = useAuth()[m
+[32m+[m[32m  const { signOut } = useAuth();[m
+   return ([m
+[31m-    <div style={{ minHeight:'100dvh', background:colors.noite, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16, fontFamily:"'Space Grotesk',sans-serif" }}>[m
+[31m-      <span style={{ fontFamily:"'Righteous',cursive", fontSize:32, color:'#fff' }}>Cheg<span style={{ color:colors.rosa }}>ô</span></span>[m
+[31m-      <p style={{ fontSize:15, color:'rgba(255,255,255,0.5)' }}>{label}</p>[m
+[31m-      <button onClick={signOut} style={{ padding:'10px 24px', borderRadius:10, background:'rgba(233,30,140,0.15)', border:'1px solid rgba(233,30,140,0.3)', color:colors.rosa, fontSize:13, fontWeight:600, fontFamily:"'Space Grotesk',sans-serif", cursor:'pointer' }}>Sair</button>[m
+[32m+[m[32m    <div[m
+[32m+[m[32m      style={{[m
+[32m+[m[32m        minHeight: "100dvh",[m
+[32m+[m[32m        background: colors.noite,[m
+[32m+[m[32m        display: "flex",[m
+[32m+[m[32m        flexDirection: "column",[m
+[32m+[m[32m        alignItems: "center",[m
+[32m+[m[32m        justifyContent: "center",[m
+[32m+[m[32m        gap: 16,[m
+[32m+[m[32m        fontFamily: "'Space Grotesk',sans-serif",[m
+[32m+[m[32m      }}[m
+[32m+[m[32m    >[m
+[32m+[m[32m      <span[m
+[32m+[m[32m        style={{[m
+[32m+[m[32m          fontFamily: "'Righteous',cursive",[m
+[32m+[m[32m          fontSize: 32,[m
+[32m+[m[32m          color: "#fff",[m
+[32m+[m[32m        }}[m
+[32m+[m[32m      >[m
+[32m+[m[32m        Cheg<span style={{ color: colors.rosa }}>ô</span>[m
+[32m+[m[32m      </span>[m
+[32m+[m[32m      <p style={{ fontSize: 15, color: "rgba(255,255,255,0.5)" }}>{label}</p>[m
+[32m+[m[32m      <button[m
+[32m+[m[32m        onClick={signOut}[m
+[32m+[m[32m        style={{[m
+[32m+[m[32m          padding: "10px 24px",[m
+[32m+[m[32m          borderRadius: 10,[m
+[32m+[m[32m          background: "rgba(233,30,140,0.15)",[m
+[32m+[m[32m          border: "1px solid rgba(233,30,140,0.3)",[m
+[32m+[m[32m          color: colors.rosa,[m
+[32m+[m[32m          fontSize: 13,[m
+[32m+[m[32m          fontWeight: 600,[m
+[32m+[m[32m          fontFamily: "'Space Grotesk',sans-serif",[m
+[32m+[m[32m          cursor: "pointer",[m
+[32m+[m[32m        }}[m
+[32m+[m[32m      >[m
+[32m+[m[32m        Sair[m
+[32m+[m[32m      </button>[m
+     </div>[m
+[31m-  )[m
+[32m+[m[32m  );[m
+ }[m
+[31m- [m
+[32m+[m
+ function Loading() {[m
+   return ([m
+[31m-    <div style={{ minHeight:'100dvh', background:colors.noite, display:'flex', alignItems:'center', justifyContent:'center' }}>[m
+[32m+[m[32m    <div[m
+[32m+[m[32m      style={{[m
+[32m+[m[32m        minHeight: "100dvh",[m
+[32m+[m[32m        background: colors.noite,[m
+[32m+[m[32m        display: "flex",[m
+[32m+[m[32m        alignItems: "center",[m
+[32m+[m[32m        justifyContent: "center",[m
+[32m+[m[32m      }}[m
+[32m+[m[32m    >[m
+       <Spinner size={36} />[m
+     </div>[m
+[31m-  )[m
+[32m+[m[32m  );[m
+ }[m
+[31m- [m
+[32m+[m
+ // Rota protegida — aguarda profile carregar antes de redirecionar[m
+[31m-function PrivateRoute({ children, allowedRoles }: { children: JSX.Element; allowedRoles?: string[] }) {[m
+[31m-  const { session, profile, loading } = useAuth()[m
+[31m-  const location = useLocation()[m
+[31m- [m
+[32m+[m[32mfunction PrivateRoute({[m
+[32m+[m[32m  children,[m
+[32m+[m[32m  allowedRoles,[m
+[32m+[m[32m}: {[m
+[32m+[m[32m  children: JSX.Element;[m
+[32m+[m[32m  allowedRoles?: string[];[m
+[32m+[m[32m}) {[m
+[32m+[m[32m  const { session, profile, loading } = useAuth();[m
+[32m+[m[32m  const location = useLocation();[m
+[32m+[m
+   // Ainda carregando sessão ou profile — espera[m
+[31m-  if (loading) return <Loading />[m
+[31m- [m
+[32m+[m[32m  if (loading) return <Loading />;[m
+[32m+[m
+   // Sem sessão — vai para login[m
+[31m-  if (!session) return <Navigate to="/" state={{ from: location }} replace />[m
+[31m- [m
+[32m+[m[32m  if (!session) return <Navigate to="/" state={{ from: location }} replace />;[m
+[32m+[m
+   // Profile ainda não chegou — espera mais um pouco[m
+[31m-  if (!profile) return <Loading />[m
+[31m- [m
+[32m+[m[32m  if (!profile) return <Loading />;[m
+[32m+[m
+   // Role errado — redireciona para a área correta[m
+   if (allowedRoles && !allowedRoles.includes(profile.role)) {[m
+     const map: Record<string, string> = {[m
+[31m-      admin:    '/admin',[m
+[31m-      store:    '/store',[m
+[31m-      motoboy:  '/motoboy',[m
+[31m-      customer: '/home',[m
+[31m-    }[m
+[31m-    return <Navigate to={map[profile.role] ?? '/'} replace />[m
+[32m+[m[32m      admin: "/admin",[m
+[32m+[m[32m      store: "/store",[m
+[32m+[m[32m      motoboy: "/motoboy",[m
+[32m+[m[32m      customer: "/home",[m
+[32m+[m[32m    };[m
+[32m+[m[32m    return <Navigate to={map[profile.role] ?? "/"} replace />;[m
+   }[m
+[31m- [m
+[31m-  return children[m
+[32m+[m
+[32m+[m[32m  return children;[m
+ }[m
+[31m- [m
+[32m+[m
+ // Rota pública — redireciona para home se já logado[m
+ function PublicRoute({ children }: { children: JSX.Element }) {[m
+[31m-  const { session, profile, loading } = useAuth()[m
+[31m- [m
+[31m-  if (loading) return <Loading />[m
+[31m- [m
+[32m+[m[32m  const { session, profile, loading } = useAuth();[m
+[32m+[m
+[32m+[m[32m  if (loading) return <Loading />;[m
+[32m+[m
+   // Aguarda profile antes de redirecionar[m
+[31m-  if (session && !profile) return <Loading />[m
+[31m- [m
+[32m+[m[32m  if (session && !profile) return <Loading />;[m
+[32m+[m
+   if (session && profile) {[m
+     const map: Record<string, string> = {[m
+[31m-      admin:    '/admin',[m
+[31m-      store:    '/store',[m
+[31m-      motoboy:  '/motoboy',[m
+[31m-      customer: '/home',[m
+[31m-    }[m
+[31m-    return <Navigate to={map[profile.role] ?? '/home'} replace />[m
+[32m+[m[32m      admin: "/admin",[m
+[32m+[m[32m      store: "/store",[m
+[32m+[m[32m      motoboy: "/motoboy",[m
+[32m+[m[32m      customer: "/home",[m
+[32m+[m[32m    };[m
+[32m+[m[32m    return <Navigate to={map[profile.role] ?? "/home"} replace />;[m
+   }[m
+[31m- [m
+[31m-  return children[m
+[32m+[m
+[32m+[m[32m  return children;[m
+ }[m
+[31m- [m
+[32m+[m
+ export default function App() {[m
+   return ([m
+     <AuthProvider>[m
+       <CartProvider>[m
+         <BrowserRouter>[m
+           <Routes>[m
+[31m- [m
+             {/* ── Públicas ── */}[m
+[31m-            <Route path="/"                element={<PublicRoute><SplashScreen /></PublicRoute>} />[m
+[31m-            <Route path="/login"           element={<PublicRoute><LoginScreen /></PublicRoute>} />[m
+[31m-            <Route path="/cadastro"        element={<PublicRoute><CadastroScreen /></PublicRoute>} />[m
+[31m-            <Route path="/recuperar-senha" element={<PublicRoute><RecoverPasswordScreen /></PublicRoute>} />[m
+[31m- [m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PublicRoute>[m
+[32m+[m[32m                  <SplashScreen />[m
+[32m+[m[32m                </PublicRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/login"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PublicRoute>[m
+[32m+[m[32m                  <LoginScreen />[m
+[32m+[m[32m                </PublicRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/cadastro"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PublicRoute>[m
+[32m+[m[32m                  <CadastroScreen />[m
+[32m+[m[32m                </PublicRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/recuperar-senha"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PublicRoute>[m
+[32m+[m[32m                  <RecoverPasswordScreen />[m
+[32m+[m[32m                </PublicRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m
+             {/* ── Cliente ── prefixo /c/ para evitar conflito com /store do comércio */}[m
+[31m-            <Route path="/home"             element={<PrivateRoute allowedRoles={['customer']}><CustomerHomeScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/loja/:id"         element={<PrivateRoute allowedRoles={['customer']}><CustomerStoreScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/cart"             element={<PrivateRoute allowedRoles={['customer']}><CartScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/payment"          element={<PrivateRoute allowedRoles={['customer']}><PaymentScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/orders"           element={<PrivateRoute allowedRoles={['customer']}><CustomerOrdersScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/orders/:id"       element={<PrivateRoute allowedRoles={['customer']}><CustomerTrackingScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/profile"          element={<PrivateRoute allowedRoles={['customer']}><CustomerProfileScreen /></PrivateRoute>} />[m
+[31m- [m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/home"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["customer"]}>[m
+[32m+[m[32m                  <CustomerHomeScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/loja/:id"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["customer"]}>[m
+[32m+[m[32m                  <CustomerStoreScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/cart"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["customer"]}>[m
+[32m+[m[32m                  <CartScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/payment"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["customer"]}>[m
+[32m+[m[32m                  <PaymentScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/orders"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["customer"]}>[m
+[32m+[m[32m                  <CustomerOrdersScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/orders/:id"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["customer"]}>[m
+[32m+[m[32m                  <CustomerTrackingScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/profile"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["customer"]}>[m
+[32m+[m[32m                  <CustomerProfileScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m
+             {/* ── Comércio ── */}[m
+[31m-            <Route path="/store"                  element={<PrivateRoute allowedRoles={['store']}><StoreDashboard /></PrivateRoute>} />[m
+[31m-            <Route path="/store/setup"            element={<PrivateRoute allowedRoles={['store']}><StoreSetupScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/store/orders/:id"       element={<PrivateRoute allowedRoles={['store']}><OrderDetailScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/store/products"         element={<PrivateRoute allowedRoles={['store']}><ProductsScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/store/profile"          element={<PrivateRoute allowedRoles={['store']}><StoreProfileScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/store/mp-config"         element={<PrivateRoute allowedRoles={['store']}><StoreMpConfigScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/store/motoboys"          element={<PrivateRoute allowedRoles={['store']}><StoreMotoboyScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/store/schedule"          element={<PrivateRoute allowedRoles={['store']}><StoreScheduleScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/store/route"            element={<PrivateRoute allowedRoles={['store']}><RouteScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/store/route/new"        element={<PrivateRoute allowedRoles={['store']}><RouteBuilderScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/store/route/confirm"    element={<PrivateRoute allowedRoles={['store']}><RouteConfirmScreen /></PrivateRoute>} />[m
+[31m-            <Route path="/store/route/live/:id"   element={<PrivateRoute allowedRoles={['store']}><RouteLiveScreen /></PrivateRoute>} />[m
+[31m- [m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/store"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["store"]}>[m
+[32m+[m[32m                  <StoreDashboard />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/store/setup"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["store"]}>[m
+[32m+[m[32m                  <StoreSetupScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/store/orders/:id"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["store"]}>[m
+[32m+[m[32m                  <OrderDetailScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/store/products"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["store"]}>[m
+[32m+[m[32m                  <ProductsScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/store/profile"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["store"]}>[m
+[32m+[m[32m                  <StoreProfileScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/store/mp-config"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["store"]}>[m
+[32m+[m[32m                  <StoreMpConfigScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/store/motoboys"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["store"]}>[m
+[32m+[m[32m                  <StoreMotoboyScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/store/schedule"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["store"]}>[m
+[32m+[m[32m                  <StoreScheduleScreen />[m
+[32m+[m[32m                </PrivateRoute>[m
+[32m+[m[32m              }[m
+[32m+[m[32m            />[m
+[32m+[m[32m            <Route[m
+[32m+[m[32m              path="/store/route"[m
+[32m+[m[32m              element={[m
+[32m+[m[32m                <PrivateRoute allowedRoles={["store"]}>[m
+[32m+[m[32m                  <RouteScreen />[m
+[32m+[m

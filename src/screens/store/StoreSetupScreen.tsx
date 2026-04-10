@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { colors, Input, Button, StepBar, Toast } from "../../components/ui";
+import { geocodeAddress } from "../../hooks/routing";
 
 interface StoreGroup {
   id: string;
