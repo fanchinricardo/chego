@@ -20,7 +20,7 @@ import StoreDashboard from "./screens/store/StoreDashboard";
 import OrderDetailScreen from "./screens/store/OrderDetailScreen";
 import ProductsScreen from "./screens/store/ProductsScreen";
 import StoreProfileScreen from "./screens/store/StoreProfileScreen";
-import StoreSetupScreen from "./screens/store/Storesetupscreen";
+import StoreSetupScreen from "./screens/store/StoreSetupSdreen";
 import StoreMpConfigScreen from "./screens/store/StoreMpConfigScreen";
 import StoreMotoboyScreen from "./screens/store/StoreMotoboyScreen";
 import StoreScheduleScreen from "./screens/store/StoreScheduleScreen";
