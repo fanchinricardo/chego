@@ -251,6 +251,7 @@ export function CustomerTrackingScreen() {
   const [routeId, setRouteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastGpsUpdate, setLastGpsUpdate] = useState("");
+  const [eta, setEta] = useState<number | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObjRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
@@ -308,13 +309,36 @@ export function CustomerTrackingScreen() {
           table: "orders",
           filter: `id=eq.${id}`,
         },
-        (payload) =>
-          setOrder((prev: any) => (prev ? { ...prev, ...payload.new } : prev)),
+        (payload) => {
+          console.log("📦 Realtime order update:", payload.new);
+          setOrder((prev: any) => (prev ? { ...prev, ...payload.new } : prev));
+        },
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("🔌 Realtime status:", status);
+      });
+
+    // Polling a cada 5s como fallback caso Realtime falhe
+    const polling = setInterval(async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("status, payment_status")
+        .eq("id", id)
+        .single();
+      if (data) {
+        setOrder((prev: any) => {
+          if (prev && prev.status !== data.status) {
+            console.log("🔄 Polling detectou mudança:", data.status);
+            return { ...prev, ...data };
+          }
+          return prev;
+        });
+      }
+    }, 5000);
 
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(polling);
     };
   }, [id]);
 
@@ -330,7 +354,38 @@ export function CustomerTrackingScreen() {
     // Atualiza marcador no mapa se já inicializado
     if (mapObjRef.current && markerRef.current && gps.lat && gps.lng) {
       markerRef.current.setLatLng([gps.lat, gps.lng]);
-      mapObjRef.current.panTo([gps.lat, gps.lng], { animate: true });
+      mapObjRef.current.panTo([gps.lat, gps.lng], {
+        animate: true,
+        duration: 1,
+      });
+    }
+
+    // Calcula ETA via OSRM se tiver coordenadas do destino
+    const destLat = order?.delivery_lat;
+    const destLng = order?.delivery_lng;
+    if (destLat && destLng && gps.lat && gps.lng) {
+      fetch(
+        `https://router.project-osrm.org/route/v1/driving/${gps.lng},${gps.lat};${destLng},${destLat}?overview=false`,
+      )
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.routes?.[0]?.duration) {
+            setEta(Math.ceil(d.routes[0].duration / 60));
+          }
+        })
+        .catch(() => {
+          // Calcula distância em linha reta como fallback (Haversine)
+          const R = 6371;
+          const dLat = ((destLat - gps.lat) * Math.PI) / 180;
+          const dLng = ((destLng - gps.lng) * Math.PI) / 180;
+          const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos((gps.lat * Math.PI) / 180) *
+              Math.cos((destLat * Math.PI) / 180) *
+              Math.sin(dLng / 2) ** 2;
+          const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          setEta(Math.ceil(km / 0.5)); // ~30km/h em cidade
+        });
     }
   }, [gps]);
 
@@ -346,7 +401,7 @@ export function CustomerTrackingScreen() {
       const map = L.map(mapRef.current, {
         center: [gps.lat, gps.lng],
         zoom: 15,
-        zoomControl: false,
+        zoomControl: true,
         attributionControl: false,
       });
 
@@ -357,28 +412,50 @@ export function CustomerTrackingScreen() {
       // Ícone motoboy
       const motoIcon = L.divIcon({
         html: `<div style="
-          width:36px;height:36px;border-radius:50%;
+          width:40px;height:40px;border-radius:50%;
           background:#e91e8c;border:3px solid #fff;
           display:flex;align-items:center;justify-content:center;
-          font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,0.3);
+          font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.4);
         ">🏍️</div>`,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
         className: "",
       });
 
-      markerRef.current = L.marker([gps.lat, gps.lng], {
-        icon: motoIcon,
-      }).addTo(map);
+      markerRef.current = L.marker([gps.lat, gps.lng], { icon: motoIcon })
+        .addTo(map)
+        .bindPopup("Motoboy");
 
-      // Círculo de destino se tiver endereço do pedido
-      const pulse = L.divIcon({
-        html: `<div style="width:20px;height:20px;border-radius:50%;border:3px solid #e91e8c;animation:chegô-ring 1.5s ease-out infinite;"></div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-        className: "",
-      });
-      L.marker([gps.lat, gps.lng], { icon: pulse }).addTo(map);
+      // Círculo de precisão do GPS
+      if (gps.accuracy) {
+        L.circle([gps.lat, gps.lng], {
+          radius: gps.accuracy,
+          color: "#e91e8c",
+          fillColor: "#e91e8c",
+          fillOpacity: 0.1,
+          weight: 1,
+        }).addTo(map);
+      }
+
+      // Marcador de destino (endereço do cliente) se tiver coordenadas
+      if (order?.delivery_lat && order?.delivery_lng) {
+        const destIcon = L.divIcon({
+          html: `<div style="font-size:28px;line-height:1;">📍</div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 28],
+          className: "",
+        });
+        L.marker([order.delivery_lat, order.delivery_lng], { icon: destIcon })
+          .addTo(map)
+          .bindPopup("Seu endereço");
+
+        // Ajusta o mapa para mostrar motoboy e destino
+        const bounds = L.latLngBounds(
+          [gps.lat, gps.lng],
+          [order.delivery_lat, order.delivery_lng],
+        );
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
 
       mapObjRef.current = map;
     };
@@ -683,7 +760,18 @@ export function CustomerTrackingScreen() {
                 lineHeight: 1,
               }}
             >
-              ~8 <span style={{ fontSize: 16, color: colors.rosa }}>min</span>
+              {eta !== null ? (
+                <>
+                  {eta}{" "}
+                  <span style={{ fontSize: 16, color: colors.rosa }}>min</span>
+                </>
+              ) : order?.delivery_lat ? (
+                <span style={{ fontSize: 14, color: "#aaa" }}>
+                  Calculando...
+                </span>
+              ) : (
+                <span style={{ fontSize: 14, color: "#aaa" }}>A caminho</span>
+              )}
             </p>
             <p style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
               {order.delivery_address ?? ""}
