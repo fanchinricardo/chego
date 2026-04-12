@@ -14,7 +14,8 @@
     "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "forceConsistentCasingInFileNames": false
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]

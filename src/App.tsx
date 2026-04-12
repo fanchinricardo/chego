@@ -24,9 +24,10 @@ import StoreSetupScreen from "./screens/store/StoreSetupScreen";
 import StoreMpConfigScreen from "./screens/store/StoreMpConfigScreen";
 import StoreMotoboyScreen from "./screens/store/StoreMotoboyScreen";
 import StoreScheduleScreen from "./screens/store/StoreScheduleScreen";
+import StoreBillingScreen from "./screens/store/StoreBillingScreen";
 import RouteBuilderScreen from "./screens/store/RouteBuilderScreen";
 import RouteConfirmScreen from "./screens/store/RouteConfirmScreen";
-import RouteScreen,{ RouteLiveScreen } from "./screens/store/RouteScreen";
+import RouteScreen, { RouteLiveScreen } from "./screens/store/RouteScreen";
 
 // Cliente
 import CustomerHomeScreen from "./screens/customer/CustomerHomeScreen";
@@ -324,6 +325,14 @@ export default function App() {
               element={
                 <PrivateRoute allowedRoles={["store"]}>
                   <StoreScheduleScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/store/billing"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <StoreBillingScreen />
                 </PrivateRoute>
               }
             />
