@@ -64,75 +64,110 @@ export default function RecoverPasswordScreen() {
   }
 
   return (
-    <div style={{
-      minHeight: '100dvh',
-      background: colors.fundo,
-      display: 'flex',
-      flexDirection: 'column',
-      fontFamily: "'Space Grotesk', sans-serif",
-    }}>
-
+    <div
+      style={{
+        minHeight: "100dvh",
+        background: colors.fundo,
+        display: "flex",
+        flexDirection: "column",
+        fontFamily: "'Space Grotesk', sans-serif",
+      }}
+    >
       {/* Header */}
-      <div style={{ background: colors.noite, padding: '20px 24px 32px' }}>
+      <div style={{ background: colors.noite, padding: "20px 24px 32px" }}>
         <button
-          onClick={() => step === 'email' ? navigate(-1) : setStep('email')}
+          onClick={() => (step === "email" ? navigate(-1) : setStep("email"))}
           style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'rgba(255,255,255,0.35)', fontSize: 13,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "#fff",
+            fontSize: 13,
             fontFamily: "'Space Grotesk', sans-serif",
-            marginBottom: 16, padding: 0,
+            marginBottom: 16,
+            padding: 0,
           }}
         >
           ← Voltar
         </button>
         <Logo size={28} />
-        <p style={{ fontSize: 22, fontWeight: 700, color: '#fff', marginTop: 12, lineHeight: 1.2 }}>
-          {step === 'success' ? 'Tudo certo!' : 'Recuperar '}
-          {step !== 'success' && <span style={{ color: colors.rosa }}>senha</span>}
+        <p
+          style={{
+            fontSize: 22,
+            fontWeight: 700,
+            color: "#fff",
+            marginTop: 12,
+            lineHeight: 1.2,
+          }}
+        >
+          {step === "success" ? "Tudo certo!" : "Recuperar "}
+          {step !== "success" && (
+            <span style={{ color: colors.rosa }}>senha</span>
+          )}
         </p>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
-          {step === 'email'   && 'Enviaremos um código no seu e-mail'}
-          {step === 'otp'     && `Código enviado para ${email}`}
-          {step === 'success' && 'Acesse seu e-mail para redefinir a senha'}
+        <p
+          style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginTop: 4 }}
+        >
+          {step === "email" && "Enviaremos um código no seu e-mail"}
+          {step === "otp" && `Código enviado para ${email}`}
+          {step === "success" && "Acesse seu e-mail para redefinir a senha"}
         </p>
       </div>
 
       {/* Corpo */}
-      <div style={{ flex: 1, padding: '28px 24px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
+      <div
+        style={{
+          flex: 1,
+          padding: "28px 24px 40px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 20,
+        }}
+      >
         {/* ── STEP EMAIL ── */}
-        {step === 'email' && (
+        {step === "email" && (
           <>
             <Input
               label="E-mail cadastrado"
               type="email"
               placeholder="seu@email.com"
               value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSendEmail()}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSendEmail()}
               autoComplete="email"
               inputMode="email"
             />
             {error && (
               <p style={{ fontSize: 12, color: colors.rosa }}>{error}</p>
             )}
-            <Button variant="primary" fullWidth loading={loading} onClick={handleSendEmail}>
+            <Button
+              variant="primary"
+              fullWidth
+              loading={loading}
+              onClick={handleSendEmail}
+            >
               Enviar código
             </Button>
           </>
         )}
 
         {/* ── STEP OTP ── */}
-        {step === 'otp' && (
+        {step === "otp" && (
           <>
-            <div style={{
-              background: '#fff',
-              border: `1.5px solid ${colors.bordaLilas}`,
-              borderRadius: 16, padding: '24px 20px',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
-            }}>
-              <p style={{ fontSize: 13, color: '#888', textAlign: 'center' }}>
-                Digite o código de 4 dígitos enviado para{' '}
+            <div
+              style={{
+                background: "#fff",
+                border: `1.5px solid ${colors.bordaLilas}`,
+                borderRadius: 16,
+                padding: "24px 20px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
+              <p style={{ fontSize: 13, color: "#888", textAlign: "center" }}>
+                Digite o código de 4 dígitos enviado para{" "}
                 <strong style={{ color: colors.noite }}>{email}</strong>
               </p>
 
@@ -142,14 +177,18 @@ export default function RecoverPasswordScreen() {
                 onClick={handleResend}
                 disabled={countdown > 0}
                 style={{
-                  background: 'none', border: 'none', cursor: countdown > 0 ? 'default' : 'pointer',
-                  fontSize: 12, fontFamily: "'Space Grotesk', sans-serif",
-                  color: countdown > 0 ? '#bbb' : colors.rosa, fontWeight: 600,
+                  background: "none",
+                  border: "none",
+                  cursor: countdown > 0 ? "default" : "pointer",
+                  fontSize: 12,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  color: countdown > 0 ? "#bbb" : colors.rosa,
+                  fontWeight: 600,
                 }}
               >
                 {countdown > 0
-                  ? `Reenviar em 00:${String(countdown).padStart(2, '0')}`
-                  : 'Reenviar código'}
+                  ? `Reenviar em 00:${String(countdown).padStart(2, "0")}`
+                  : "Reenviar código"}
               </button>
             </div>
 
@@ -169,38 +208,52 @@ export default function RecoverPasswordScreen() {
         )}
 
         {/* ── STEP SUCCESS ── */}
-        {step === 'success' && (
+        {step === "success" && (
           <>
-            <div style={{
-              background: '#f0fff4',
-              border: '1.5px solid #86efac',
-              borderRadius: 16, padding: '28px 24px',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-              textAlign: 'center',
-            }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: '50%',
-                background: '#22c55e', display: 'flex',
-                alignItems: 'center', justifyContent: 'center',
-                fontSize: 26,
-              }}>✓</div>
-              <p style={{ fontSize: 15, fontWeight: 700, color: '#166534' }}>
+            <div
+              style={{
+                background: "#f0fff4",
+                border: "1.5px solid #86efac",
+                borderRadius: 16,
+                padding: "28px 24px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 12,
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: "50%",
+                  background: "#22c55e",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 26,
+                }}
+              >
+                ✓
+              </div>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#166534" }}>
                 Link enviado!
               </p>
-              <p style={{ fontSize: 13, color: '#4ade80', lineHeight: 1.6 }}>
-                Verifique sua caixa de entrada e clique no link para criar uma nova senha.
+              <p style={{ fontSize: 13, color: "#4ade80", lineHeight: 1.6 }}>
+                Verifique sua caixa de entrada e clique no link para criar uma
+                nova senha.
               </p>
             </div>
 
-            <Button variant="dark" fullWidth onClick={() => navigate('/login')}>
+            <Button variant="dark" fullWidth onClick={() => navigate("/login")}>
               Voltar para o login
             </Button>
           </>
         )}
-
       </div>
 
       {toast && <Toast message={toast} />}
     </div>
-  )
+  );
 }

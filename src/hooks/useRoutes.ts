@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../lib/supabase";
+import { notify } from "../services/whatsapp";
 
 export type RouteStatus = "pending" | "in_progress" | "completed" | "cancelled";
 
@@ -144,6 +145,10 @@ export function useRoutes(storeId: string | null) {
       );
 
     setRoutes((prev) => [route as DeliveryRoute, ...prev]);
+
+    // Notifica motoboy e clientes via WhatsApp
+    notify.routeStarted(route.id);
+
     return route as DeliveryRoute;
   }
 

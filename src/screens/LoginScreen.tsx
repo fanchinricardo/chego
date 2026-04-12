@@ -73,7 +73,7 @@ export default function LoginScreen() {
             background: "none",
             border: "none",
             cursor: "pointer",
-            color: "rgba(255,255,255,0.35)",
+            color: "#fff",
             fontSize: 13,
             fontFamily: "'Space Grotesk', sans-serif",
             marginBottom: 16,
@@ -199,48 +199,6 @@ export default function LoginScreen() {
         </Button>
 
         <Divider />
-
-        {/* Google */}
-        <button
-          onClick={handleGoogle}
-          disabled={googleLoad}
-          style={{
-            width: "100%",
-            padding: "13px 20px",
-            borderRadius: 13,
-            background: "#fff",
-            border: `1.5px solid ${colors.bordaLilas}`,
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: 14,
-            fontWeight: 600,
-            color: colors.noite,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 10,
-            opacity: googleLoad ? 0.6 : 1,
-          }}
-        >
-          <div
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: "50%",
-              background: colors.rosa,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 11,
-              fontWeight: 800,
-              color: "#fff",
-              flexShrink: 0,
-            }}
-          >
-            G
-          </div>
-          {googleLoad ? "Aguarde..." : "Entrar com Google"}
-        </button>
 
         {/* Link cadastro */}
         <p

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useStore } from "../../hooks/useStore";
 import { useOrders, Order, OrderStatus } from "../../hooks/useOrders";
 import { colors, Logo, Spinner, Toast } from "../../components/ui";
+import { notify } from "../../services/whatsapp";
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: "Novo",
@@ -20,7 +21,6 @@ const STATUS_NEXT: Partial<
   pending: { label: "Confirmar", next: "confirmed" },
   confirmed: { label: "Preparar", next: "preparing" },
   preparing: { label: "Pronto!", next: "ready" },
-  ready: { label: "Entregar", next: "in_delivery" },
 };
 
 const STATUS_COLORS: Record<
@@ -83,6 +83,7 @@ export default function StoreDashboard() {
     try {
       await updateStatus(orderId, next);
       showToast(`Pedido ${STATUS_LABEL[next].toLowerCase()}!`);
+      if (next === "preparing") notify.orderPreparing(orderId);
     } catch {
       showToast("Erro ao atualizar pedido", "error");
     }
@@ -465,6 +466,22 @@ function OrderCard({
       ?.map((i) => `${i.quantity}× ${i.products?.name}`)
       .join(" · ") ?? "";
 
+  const PAYMENT_LABEL: Record<string, string> = {
+    pix_qr: "⚡ Pix QR",
+    pix_manual: "📋 Pix Manual",
+    dinheiro: "💵 Dinheiro",
+    credito_mp: "💳 Crédito MP",
+    credito_ent: "💳 Crédito",
+    debito_ent: "💳 Débito",
+  };
+  const payLabel =
+    PAYMENT_LABEL[(order as any).payment_method ?? ""] ?? "💳 Pagamento";
+  const isPaid = order.payment_status === "paid";
+  const isOnline =
+    (order as any).payment_method === "pix_qr" ||
+    (order as any).payment_method === "credito_mp";
+  const isPickup = (order as any).delivery_type === "pickup";
+
   return (
     <div
       style={{
@@ -532,6 +549,113 @@ function OrderCard({
         </div>
       )}
 
+      {/* Aviso: pronto mas sem rota (apenas entrega) */}
+      {order.status === "ready" && !isPickup && (
+        <div
+          style={{
+            margin: "0 14px 8px",
+            padding: "8px 10px",
+            borderRadius: 8,
+            background: "#fff8e6",
+            border: "1px solid #fcd34d",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <span style={{ fontSize: 14 }}>⚠️</span>
+          <p style={{ fontSize: 11, color: "#92400e", fontWeight: 600 }}>
+            Pedido pronto! Adicione à uma rota na aba <strong>Rota</strong> para
+            enviar.
+          </p>
+        </div>
+      )}
+
+      {/* Pagamento */}
+      <div
+        style={{
+          padding: "4px 14px 8px",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          flexWrap: "wrap" as const,
+        }}
+      >
+        {isPickup ? (
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "2px 7px",
+              borderRadius: 8,
+              background: "#f0fdf4",
+              color: "#15803d",
+              border: "1px solid #86efac",
+            }}
+          >
+            🏪 Retirada
+          </span>
+        ) : (
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "2px 7px",
+              borderRadius: 8,
+              background: colors.lilasClaro,
+              color: "#7e22ce",
+              border: `1px solid ${colors.bordaLilas}`,
+            }}
+          >
+            🛵 Entrega
+          </span>
+        )}
+        <span style={{ fontSize: 10, color: "#888" }}>{payLabel}</span>
+        {isPaid ? (
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "2px 7px",
+              borderRadius: 8,
+              background: "#f0fdf4",
+              color: "#15803d",
+              border: "1px solid #86efac",
+            }}
+          >
+            ✓ PAGO
+          </span>
+        ) : isOnline ? (
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "2px 7px",
+              borderRadius: 8,
+              background: "#fff8e6",
+              color: "#b45309",
+              border: "1px solid #fcd34d",
+            }}
+          >
+            AGUARD. PAGAMENTO
+          </span>
+        ) : (
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "2px 7px",
+              borderRadius: 8,
+              background: colors.lilasClaro,
+              color: "#7e22ce",
+              border: `1px solid ${colors.bordaLilas}`,
+            }}
+          >
+            PAGAR NA ENTREGA
+          </span>
+        )}
+      </div>
+
       <div
         style={{
           background: colors.fundo,
@@ -545,27 +669,75 @@ function OrderCard({
         <p style={{ fontSize: 13, fontWeight: 700, color: colors.rosa }}>
           R$ {Number(order.total).toFixed(2)}
         </p>
-        {next && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdateStatus(order.id, next.next);
-            }}
-            style={{
-              padding: "6px 14px",
-              borderRadius: 8,
-              background: colors.noite,
-              color: "#fff",
-              border: "none",
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}
-          >
-            {next.label}
-          </button>
-        )}
+        <div style={{ display: "flex", gap: 6 }}>
+          {/* Cancelar — só antes de preparar */}
+          {(order.status === "pending" || order.status === "confirmed") &&
+            order.payment_status !== "paid" && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm("Cancelar este pedido?"))
+                    onUpdateStatus(order.id, "cancelled");
+                }}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  background: "#fef2f2",
+                  color: "#991b1b",
+                  border: "1px solid #fca5a5",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                Cancelar
+              </button>
+            )}
+          {/* Retirada pronta — confirma direto */}
+          {order.status === "ready" && isPickup && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateStatus(order.id, "delivered");
+              }}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 8,
+                background: "#22c55e",
+                color: "#fff",
+                border: "none",
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              🏪 Confirmar retirada
+            </button>
+          )}
+          {next && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateStatus(order.id, next.next);
+              }}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 8,
+                background: colors.noite,
+                color: "#fff",
+                border: "none",
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              {next.label}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

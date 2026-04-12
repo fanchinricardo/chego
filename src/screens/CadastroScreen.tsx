@@ -92,11 +92,35 @@ export default function CadastroScreen() {
   // ── Validação passo 2 → 3 ──────────────────────────────
   async function goToStep2() {
     const e: Record<string, string> = {};
+
+    // Nome completo — mínimo 3 chars e deve ter pelo menos 2 palavras
     if (!fullName.trim()) e.fullName = "Informe seu nome completo";
+    else if (fullName.trim().length < 3)
+      e.fullName = "Nome deve ter no mínimo 3 caracteres";
+    else if (
+      fullName
+        .trim()
+        .split(" ")
+        .filter((w) => w.length > 0).length < 2
+    )
+      e.fullName = "Informe nome e sobrenome";
+
+    // Telefone — mínimo 10 dígitos (com DDD)
+    const phoneDigits = phone.replace(/\D/g, "");
     if (!phone.trim()) e.phone = "Informe seu WhatsApp";
+    else if (phoneDigits.length < 10)
+      e.phone = "Informe o número com DDD (ex: 11999999999)";
+    else if (phoneDigits.length > 11) e.phone = "Número inválido";
+
+    // E-mail básico
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim()) e.email = "Informe seu e-mail";
-    if (password.length < 8)
-      e.password = "Senha deve ter no mínimo 8 caracteres";
+    else if (!emailRegex.test(email.trim())) e.email = "E-mail inválido";
+
+    // Senha — mínimo 6 chars
+    if (password.length < 6)
+      e.password = "Senha deve ter no mínimo 6 caracteres";
+
     if (Object.keys(e).length) {
       setErrors(e);
       return;
@@ -173,65 +197,85 @@ export default function CadastroScreen() {
       }}
     >
       {/* ── Header ── */}
-      <div style={{ background: colors.noite, padding: "20px 24px 28px" }}>
-        <button
-          onClick={back}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "rgba(255,255,255,0.35)",
-            fontSize: 13,
-            fontFamily: "'Space Grotesk', sans-serif",
-            marginBottom: 14,
-            padding: 0,
-          }}
+      <div style={{ background: colors.noite }}>
+        <div
+          style={{ maxWidth: 520, margin: "0 auto", padding: "20px 24px 28px" }}
         >
-          ← Voltar
-        </button>
+          <button
+            onClick={back}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "rgba(255,255,255,0.35)",
+              fontSize: 13,
+              fontFamily: "'Space Grotesk', sans-serif",
+              marginBottom: 14,
+              padding: 0,
+            }}
+          >
+            ← Voltar
+          </button>
 
-        <StepBar total={3} current={step} />
+          <StepBar total={3} current={step} />
 
-        <p
-          style={{
-            fontSize: 11,
-            color: "rgba(255,255,255,0.3)",
-            marginBottom: 6,
-          }}
-        >
-          Passo {step + 1} de 3
-        </p>
-        <p
-          style={{
-            fontSize: 24,
-            fontWeight: 700,
-            color: "#fff",
-            lineHeight: 1.2,
-          }}
-        >
-          {STEP_TITLES[step].title}{" "}
-          <span style={{ color: colors.rosa }}>{STEP_TITLES[step].accent}</span>
-        </p>
+          <p
+            style={{
+              fontSize: 11,
+              color: "rgba(255,255,255,0.3)",
+              marginBottom: 6,
+            }}
+          >
+            Passo {step + 1} de 3
+          </p>
+          <p
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              color: "#fff",
+              lineHeight: 1.2,
+            }}
+          >
+            {STEP_TITLES[step].title}{" "}
+            <span style={{ color: colors.rosa }}>
+              {STEP_TITLES[step].accent}
+            </span>
+          </p>
+        </div>
+        {/* fecha maxWidth header */}
       </div>
+      {/* fecha background noite */}
 
       {/* ── Corpo ── */}
       <div
         style={{
           flex: 1,
+          maxWidth: 520,
+          margin: "0 auto",
+          width: "100%",
           padding: "24px 24px 40px",
           display: "flex",
           flexDirection: "column",
           gap: 16,
+          minHeight: 0,
         }}
       >
         {/* ── PASSO 0: Tipo de conta ── */}
         {step === 0 && (
-          <>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              gap: 16,
+            }}
+          >
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
-                gap: 10,
+                gap: 12,
               }}
             >
               {ACCOUNT_TYPES.map((t) => (
@@ -239,19 +283,23 @@ export default function CadastroScreen() {
                   key={t.role}
                   onClick={() => setRole(t.role)}
                   style={{
-                    borderRadius: 14,
-                    padding: "16px 12px",
-                    border: `1.5px solid ${role === t.role ? colors.rosa : colors.bordaLilas}`,
+                    borderRadius: 16,
+                    padding: "24px 12px",
+                    border: `2px solid ${role === t.role ? colors.rosa : colors.bordaLilas}`,
                     background: role === t.role ? colors.lilasInput : "#fff",
                     cursor: "pointer",
                     textAlign: "center",
                     transition: "all 0.15s",
+                    boxShadow:
+                      role === t.role
+                        ? "0 4px 16px rgba(233,30,140,0.15)"
+                        : "none",
                   }}
                 >
-                  <div style={{ fontSize: 28, marginBottom: 6 }}>{t.icon}</div>
+                  <div style={{ fontSize: 36, marginBottom: 10 }}>{t.icon}</div>
                   <div
                     style={{
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: 700,
                       color: colors.noite,
                     }}
@@ -262,7 +310,7 @@ export default function CadastroScreen() {
                     style={{
                       fontSize: 11,
                       color: "#aaa",
-                      marginTop: 3,
+                      marginTop: 4,
                       lineHeight: 1.4,
                     }}
                   >
@@ -294,7 +342,7 @@ export default function CadastroScreen() {
                 Fazer login
               </span>
             </p>
-          </>
+          </div>
         )}
 
         {/* ── PASSO 1: Dados pessoais ── */}
@@ -331,7 +379,7 @@ export default function CadastroScreen() {
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               <Input
                 label="Senha"
-                placeholder="mínimo 8 caracteres"
+                placeholder="mínimo 6 caracteres"
                 type={showPass ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -381,7 +429,7 @@ export default function CadastroScreen() {
                     />
                   ))}
                   <span style={{ fontSize: 10, color: "#aaa", minWidth: 40 }}>
-                    {password.length < 4
+                    {password.length < 6
                       ? "fraca"
                       : password.length < 8
                         ? "média"

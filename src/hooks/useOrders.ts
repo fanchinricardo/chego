@@ -27,6 +27,7 @@ export interface Order {
   customer_id: string;
   status: OrderStatus;
   payment_status: "pending" | "paid" | "failed" | "refunded";
+  payment_method: string | null;
   subtotal: number;
   delivery_fee: number;
   total: number;

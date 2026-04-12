@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { Order, OrderStatus } from "../../hooks/useOrders";
 import { colors, Spinner, Toast } from "../../components/ui";
+import { notify } from "../../services/whatsapp";
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: "Novo pedido",
@@ -61,6 +62,8 @@ export default function OrderDetailScreen() {
       await supabase.from("orders").update({ status: next }).eq("id", order.id);
       setOrder((prev) => (prev ? { ...prev, status: next } : prev));
       showToast(`Pedido ${STATUS_LABEL[next].toLowerCase()}!`);
+      // Notificações WhatsApp
+      if (next === "preparing") notify.orderPreparing(order.id);
       if (next === "delivered") setTimeout(() => navigate(-1), 1500);
     } catch {
       showToast("Erro ao atualizar", "error");
@@ -297,27 +300,37 @@ export default function OrderDetailScreen() {
               marginBottom: 8,
             }}
           >
-            Endereço de entrega
+            {(order as any).delivery_type === "pickup"
+              ? "🏪 Retirada no local"
+              : "Endereço de entrega"}
           </p>
-          <p style={{ fontSize: 13, color: colors.noite, lineHeight: 1.6 }}>
-            {order.delivery_address ?? "Endereço não informado"}
-          </p>
-          {order.delivery_lat && order.delivery_lng && (
-            <a
-              href={`https://maps.google.com/?q=${order.delivery_lat},${order.delivery_lng}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                fontSize: 12,
-                color: colors.rosa,
-                fontWeight: 600,
-                display: "inline-block",
-                marginTop: 6,
-              }}
-            >
-              Ver no mapa →
-            </a>
+          {(order as any).delivery_type === "pickup" ? (
+            <p style={{ fontSize: 13, color: "#15803d", fontWeight: 600 }}>
+              Cliente vai retirar no estabelecimento
+            </p>
+          ) : (
+            <p style={{ fontSize: 13, color: colors.noite, lineHeight: 1.6 }}>
+              {order.delivery_address ?? "Endereço não informado"}
+            </p>
           )}
+          {order.delivery_lat &&
+            order.delivery_lng &&
+            (order as any).delivery_type !== "pickup" && (
+              <a
+                href={`https://maps.google.com/?q=${order.delivery_lat},${order.delivery_lng}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  fontSize: 12,
+                  color: colors.rosa,
+                  fontWeight: 600,
+                  display: "inline-block",
+                  marginTop: 6,
+                }}
+              >
+                Ver no mapa →
+              </a>
+            )}
         </div>
 
         {/* Cliente */}
@@ -452,47 +465,95 @@ export default function OrderDetailScreen() {
         )}
 
         {/* Ações */}
-        {nextAction && order.status !== "cancelled" && (
-          <button
-            onClick={() => handleUpdateStatus(nextAction.next)}
-            disabled={saving}
-            style={{
-              width: "100%",
-              padding: "14px",
-              borderRadius: 13,
-              background: colors.rosa,
-              color: "#fff",
-              border: "none",
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: saving ? "not-allowed" : "pointer",
-              opacity: saving ? 0.7 : 1,
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}
-          >
-            {saving ? "Atualizando..." : nextAction.label}
-          </button>
+        {order.status !== "cancelled" && (
+          <>
+            {/* Status ready — diferencia entrega de retirada */}
+            {order.status === "ready" ? (
+              (order as any).delivery_type === "pickup" ? (
+                <button
+                  onClick={() => handleUpdateStatus("delivered")}
+                  disabled={saving}
+                  style={{
+                    width: "100%",
+                    padding: "14px",
+                    borderRadius: 13,
+                    background: "#22c55e",
+                    color: "#fff",
+                    border: "none",
+                    fontSize: 15,
+                    fontWeight: 700,
+                    cursor: saving ? "not-allowed" : "pointer",
+                    opacity: saving ? 0.7 : 1,
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  {saving ? "Atualizando..." : "🏪 Confirmar retirada"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleUpdateStatus("in_delivery")}
+                  disabled={saving}
+                  style={{
+                    width: "100%",
+                    padding: "14px",
+                    borderRadius: 13,
+                    background: colors.rosa,
+                    color: "#fff",
+                    border: "none",
+                    fontSize: 15,
+                    fontWeight: 700,
+                    cursor: saving ? "not-allowed" : "pointer",
+                    opacity: saving ? 0.7 : 1,
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  {saving ? "Atualizando..." : "🛵 Iniciar entrega"}
+                </button>
+              )
+            ) : nextAction ? (
+              <button
+                onClick={() => handleUpdateStatus(nextAction.next)}
+                disabled={saving}
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  borderRadius: 13,
+                  background: colors.rosa,
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: saving ? "not-allowed" : "pointer",
+                  opacity: saving ? 0.7 : 1,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                {saving ? "Atualizando..." : nextAction.label}
+              </button>
+            ) : null}
+          </>
         )}
 
-        {["pending", "confirmed", "preparing"].includes(order.status) && (
-          <button
-            onClick={handleCancel}
-            style={{
-              width: "100%",
-              padding: "12px",
-              borderRadius: 13,
-              background: "#fff",
-              color: colors.rosa,
-              border: `1.5px solid ${colors.bordaLilas}`,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}
-          >
-            Cancelar pedido
-          </button>
-        )}
+        {["pending", "confirmed"].includes(order.status) &&
+          order.payment_status !== "paid" && (
+            <button
+              onClick={handleCancel}
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: 13,
+                background: "#fff",
+                color: colors.rosa,
+                border: `1.5px solid ${colors.bordaLilas}`,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              Cancelar pedido
+            </button>
+          )}
       </div>
 
       {toast && <Toast message={toast} type={toastType} />}

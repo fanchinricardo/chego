@@ -190,7 +190,7 @@ export default function StoreSetupScreen() {
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: "rgba(255,255,255,0.35)",
+              color: "#fff",
               fontSize: 13,
               fontFamily: "'Space Grotesk', sans-serif",
               marginBottom: 12,

@@ -216,7 +216,7 @@ function translateAuthError(msg: string): string {
     "Invalid login credentials": "E-mail ou senha incorretos",
     "Email not confirmed": "Confirme seu e-mail antes de entrar",
     "User already registered": "Este e-mail já está cadastrado",
-    "Password should be at least 6": "Senha deve ter no mínimo 6 caracteres",
+    "Password should be at least 4": "Senha deve ter no mínimo 4 caracteres",
     "Phone number format is invalid": "Telefone inválido. Use DDI+DDD+número",
     "Token has expired": "Código expirado. Solicite um novo",
     "Invalid OTP": "Código inválido",

@@ -53,7 +53,7 @@ export default function SplashScreen() {
             marginTop: 4,
           }}
         >
-          entrega do seu bairro
+          seu pedido esta aqui
         </p>
 
         {/* Três pontinhos pulsantes */}
@@ -117,12 +117,7 @@ export default function SplashScreen() {
             marginTop: 6,
           }}
         >
-          Ao continuar você aceita os{" "}
-          <span style={{ color: "rgba(233,30,140,0.6)" }}>Termos de Uso</span> e
-          a{" "}
-          <span style={{ color: "rgba(233,30,140,0.6)" }}>
-            Política de Privacidade
-          </span>
+          Um aplicativo de RFSolutions{" "}
         </p>
       </div>
     </div>

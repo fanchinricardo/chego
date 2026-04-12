@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../lib/supabase";
+import { notify } from "../services/whatsapp";
 import { useAuth } from "../contexts/AuthContext";
 import { DeliveryRoute, RouteStop } from "./useRoutes";
 
@@ -168,6 +169,9 @@ export function useMotoboyData() {
         routeStops.map((s) => s.order_id),
       );
 
+    // Notifica clientes que o motoboy aceitou e está a caminho
+    notify.routeAccepted(routeId);
+
     await fetchActiveRoute();
   }
 
@@ -180,7 +184,7 @@ export function useMotoboyData() {
     const now = new Date().toISOString();
 
     // Atualiza a entrega
-    await supabase
+    const { error: delErr } = await supabase
       .from("deliveries")
       .update({
         delivered_at: now,
@@ -189,11 +193,36 @@ export function useMotoboyData() {
       })
       .eq("order_id", orderId);
 
-    // Atualiza status do pedido
-    await supabase
-      .from("orders")
-      .update({ status: "delivered" })
-      .eq("id", orderId);
+    if (delErr) console.error("❌ Erro ao atualizar delivery:", delErr.message);
+    else console.log("✅ Delivery atualizado");
+
+    // Confirma entrega via Edge Function (bypassa RLS com service role)
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/confirm-delivery`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          order_id: orderId,
+          notes: notes ?? null,
+          signature_url: signatureUrl ?? null,
+        }),
+      },
+    );
+
+    const result = await res.json();
+    if (!res.ok) {
+      console.error("❌ Erro na Edge Function:", result.error);
+    } else {
+      console.log("✅ Entrega confirmada via Edge Function");
+    }
 
     // Atualiza stop local
     setStops((prev) =>

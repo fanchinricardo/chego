@@ -270,7 +270,7 @@ export function Spinner({
 }
 
 // ── Divider ───────────────────────────────────────────────
-export function Divider({ label = "ou continue com" }: { label?: string }) {
+export function Divider({ label = "" }: { label?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <div style={{ flex: 1, height: 1, background: colors.bordaLilas }} />
