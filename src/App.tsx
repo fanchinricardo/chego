@@ -26,6 +26,8 @@ import StoreMpConfigScreen from "./screens/store/StoreMpConfigScreen";
 import StoreMotoboyScreen from "./screens/store/StoreMotoboyScreen";
 import StoreScheduleScreen from "./screens/store/StoreScheduleScreen";
 import StoreChangeEmailScreen from "./screens/store/StoreChangeEmailScreen";
+import StoreSizesScreen from "./screens/store/StoreSizesScreen";
+import ProductSizePricesScreen from "./screens/store/ProductSizePricesScreen";
 import StoreBillingScreen from "./screens/store/StoreBillingScreen";
 import RouteBuilderScreen from "./screens/store/RouteBuilderScreen";
 import RouteConfirmScreen from "./screens/store/RouteConfirmScreen";
@@ -336,6 +338,22 @@ export default function App() {
               element={
                 <PrivateRoute allowedRoles={["store"]}>
                   <StoreChangeEmailScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/store/sizes"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <StoreSizesScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/store/product-sizes/:productId"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <ProductSizePricesScreen />
                 </PrivateRoute>
               }
             />

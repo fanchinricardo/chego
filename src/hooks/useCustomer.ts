@@ -31,6 +31,8 @@ export interface ProductPublic {
   price: number;
   image_url: string | null;
   active: boolean;
+  allows_half: boolean;
+  size_type: string; // 'none' | 'sizes'
 }
 
 // Hook: lista de comércios com filtro por grupo e busca

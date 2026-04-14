@@ -329,6 +329,11 @@ export default function StoreProfileScreen() {
                 label: "Faturamento e faturas",
                 path: "/store/billing",
               },
+              {
+                icon: "📐",
+                label: "Tamanhos de produto",
+                path: "/store/sizes",
+              },
               { icon: "🏍️", label: "Meus motoboys", path: "/store/motoboys" },
               {
                 icon: "📧",

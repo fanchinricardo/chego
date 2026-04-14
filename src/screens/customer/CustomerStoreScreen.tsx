@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useStoreDetail, useStoreProducts } from "../../hooks/useCustomer";
 import { useCart } from "../../contexts/CartContext";
+import { ProductModal, CartItem } from "../../components/ProductModal";
 import { colors, Spinner, Toast } from "../../components/ui";
 
 export default function CustomerStoreScreen() {
@@ -463,8 +464,19 @@ export default function CustomerStoreScreen() {
         </div>
       )}
 
-      {/* Modal de produto */}
-      {selectedProduct && (
+      {/* Modal de produto — com tamanhos e meia pizza */}
+      {selectedProduct && store && (
+        <ProductModal
+          product={selectedProduct}
+          storeId={store.id}
+          allProducts={products}
+          onAdd={handleCartItemAdd}
+          onClose={() => setSelectedProduct(null)}
+        />
+      )}
+
+      {/* REMOVIDO: modal inline antigo */}
+      {false && (
         <div
           style={{
             position: "fixed",

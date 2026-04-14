@@ -1,8 +1,13 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useStore } from "../../hooks/useStore";
 import { useProducts, Product, ProductPayload } from "../../hooks/useProducts";
+import {
+  useProductSizes,
+  useProductSizePrices,
+} from "../../hooks/useProductSizes";
 import { colors, Input, Button, Spinner, Toast } from "../../components/ui";
 import { BottomNav } from "./StoreDashboard";
+import { useNavigate } from "react-router-dom";
 
 const EMOJI_CATEGORIES: Record<string, string> = {
   Geral: "📦",
@@ -23,6 +28,8 @@ const EMPTY_FORM: ProductPayload & { imageFile?: File; imagePreview?: string } =
     price: 0,
     category: "Geral",
     active: true,
+    allows_half: false,
+    size_type: "none",
   };
 
 export default function ProductsScreen() {
@@ -70,6 +77,8 @@ export default function ProductsScreen() {
       price: p.price,
       category: p.category,
       active: p.active,
+      allows_half: (p as any).allows_half ?? false,
+      size_type: (p as any).size_type ?? "none",
     });
     setErrors({});
     setShowModal(true);
@@ -100,6 +109,8 @@ export default function ProductsScreen() {
         price: Number(form.price),
         category: form.category,
         active: form.active,
+        allows_half: (form as any).allows_half ?? false,
+        size_type: (form as any).size_type ?? "none",
       };
       if (editing) {
         await updateProduct(editing.id, payload, form.imageFile);
@@ -601,6 +612,150 @@ export default function ProductsScreen() {
                     outline: "none",
                   }}
                 />
+              </div>
+
+              {/* ── Tipo de tamanho ── */}
+              <div
+                style={{
+                  background: "#fff",
+                  borderRadius: 11,
+                  border: `1px solid ${colors.bordaLilas}`,
+                  padding: "10px 14px",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#aaa",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    marginBottom: 8,
+                  }}
+                >
+                  Tamanhos
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[
+                    { val: "none", label: "❌ Sem tamanho" },
+                    { val: "sizes", label: "📐 Com tamanhos" },
+                  ].map((opt) => (
+                    <div
+                      key={opt.val}
+                      onClick={() =>
+                        setForm((f) => ({ ...f, size_type: opt.val }) as any)
+                      }
+                      style={{
+                        flex: 1,
+                        padding: "8px",
+                        borderRadius: 9,
+                        border: `1.5px solid ${(form as any).size_type === opt.val ? colors.rosa : colors.bordaLilas}`,
+                        background:
+                          (form as any).size_type === opt.val
+                            ? "#fff0f8"
+                            : "#fafafa",
+                        cursor: "pointer",
+                        textAlign: "center",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color:
+                          (form as any).size_type === opt.val
+                            ? colors.rosa
+                            : "#888",
+                      }}
+                    >
+                      {opt.label}
+                    </div>
+                  ))}
+                </div>
+                {(form as any).size_type === "sizes" && editing && (
+                  <button
+                    onClick={() =>
+                      navigate(`/store/product-sizes/${editing.id}`)
+                    }
+                    style={{
+                      marginTop: 8,
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: 9,
+                      background: colors.lilasClaro,
+                      border: "none",
+                      color: "#7e22ce",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    ⚙️ Definir preços por tamanho →
+                  </button>
+                )}
+                {(form as any).size_type === "sizes" && !editing && (
+                  <p style={{ fontSize: 11, color: "#aaa", marginTop: 6 }}>
+                    💡 Salve o produto primeiro para definir preços por tamanho.
+                  </p>
+                )}
+              </div>
+
+              {/* ── Meia pizza ── */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  background: "#fff",
+                  borderRadius: 11,
+                  border: `1px solid ${colors.bordaLilas}`,
+                  padding: "10px 14px",
+                }}
+              >
+                <div>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: colors.noite,
+                    }}
+                  >
+                    🍕 Permite meia pizza
+                  </p>
+                  <p style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
+                    Cliente pode escolher dois sabores
+                  </p>
+                </div>
+                <div
+                  onClick={() =>
+                    setForm(
+                      (f) =>
+                        ({ ...f, allows_half: !(f as any).allows_half }) as any,
+                    )
+                  }
+                  style={{
+                    width: 40,
+                    height: 22,
+                    borderRadius: 11,
+                    background: (form as any).allows_half
+                      ? colors.rosa
+                      : "#d1d5db",
+                    position: "relative",
+                    cursor: "pointer",
+                    transition: "background 0.2s",
+                    flexShrink: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 3,
+                      left: (form as any).allows_half ? 20 : 3,
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      background: "#fff",
+                      transition: "left 0.2s",
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Toggle ativo */}
