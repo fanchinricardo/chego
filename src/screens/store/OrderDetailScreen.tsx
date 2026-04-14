@@ -128,57 +128,61 @@ export default function OrderDetailScreen() {
       }}
     >
       {/* Header */}
-      <div style={{ background: colors.noite, padding: "16px 20px 20px" }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            background: "none",
-            border: "none",
-            color: "rgba(255,255,255,0.35)",
-            fontSize: 13,
-            cursor: "pointer",
-            marginBottom: 12,
-            padding: 0,
-            fontFamily: "'Space Grotesk', sans-serif",
-          }}
-        >
-          ← Voltar
-        </button>
+      <div style={{ background: colors.noite }}>
         <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-          }}
+          style={{ maxWidth: 520, margin: "0 auto", padding: "16px 20px 20px" }}
         >
-          <div>
-            <p
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: "#fff",
-                marginBottom: 2,
-              }}
-            >
-              Pedido #{order.id.slice(0, 6).toUpperCase()}
-            </p>
-            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
-              {order.profiles?.full_name} · {time}
-            </p>
-          </div>
-          <span
+          <button
+            onClick={() => navigate(-1)}
             style={{
-              fontSize: 11,
-              fontWeight: 700,
-              padding: "4px 12px",
-              borderRadius: 20,
-              background: "rgba(233,30,140,0.15)",
-              color: colors.rosa,
-              border: `1px solid rgba(233,30,140,0.3)`,
+              background: "none",
+              border: "none",
+              color: "rgba(255,255,255,0.35)",
+              fontSize: 13,
+              cursor: "pointer",
+              marginBottom: 12,
+              padding: 0,
+              fontFamily: "'Space Grotesk', sans-serif",
             }}
           >
-            {STATUS_LABEL[order.status]}
-          </span>
+            ← Voltar
+          </button>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+            }}
+          >
+            <div>
+              <p
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "#fff",
+                  marginBottom: 2,
+                }}
+              >
+                Pedido #{order.id.slice(0, 6).toUpperCase()}
+              </p>
+              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
+                {order.profiles?.full_name} · {time}
+              </p>
+            </div>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "4px 12px",
+                borderRadius: 20,
+                background: "rgba(233,30,140,0.15)",
+                color: colors.rosa,
+                border: `1px solid rgba(233,30,140,0.3)`,
+              }}
+            >
+              {STATUS_LABEL[order.status]}
+            </span>
+          </div>
         </div>
       </div>
 

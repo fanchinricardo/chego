@@ -7,14 +7,12 @@ import { useCustomerAddresses } from "../../hooks/useCustomer";
 import { colors, Button, Spinner, Toast } from "../../components/ui";
 import { notify } from "../../services/whatsapp";
 
-// ── Gerador de payload Pix BR Code (padrão BACEN EMV) ────────
 function crc16(str: string): string {
   let crc = 0xffff;
   for (let i = 0; i < str.length; i++) {
     crc ^= str.charCodeAt(i) << 8;
-    for (let j = 0; j < 8; j++) {
+    for (let j = 0; j < 8; j++)
       crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
-    }
     crc &= 0xffff;
   }
   return crc.toString(16).toUpperCase().padStart(4, "0");
@@ -32,43 +30,12 @@ function sanitize(str: string, maxLen: number): string {
     .toUpperCase()
     .slice(0, maxLen);
 }
-function buildPixPayload(opts: {
-  pixKey: string;
-  merchantName: string;
-  merchantCity: string;
-  amount: number;
-  txId?: string;
-}): string {
-  const name = sanitize(opts.merchantName, 25);
-  const city = sanitize(opts.merchantCity, 15);
-  const txId =
-    (opts.txId ?? "CHEGOPEDIDO").replace(/[^a-zA-Z0-9]/g, "").slice(0, 25) ||
-    "CHEGOPEDIDO";
-  const mai = emv(
-    "26",
-    emv("00", "BR.GOV.BCB.PIX") + emv("01", opts.pixKey.trim()),
-  );
-  const payload =
-    emv("00", "01") +
-    emv("01", "12") +
-    mai +
-    emv("52", "0000") +
-    emv("53", "986") +
-    emv("54", opts.amount.toFixed(2)) +
-    emv("58", "BR") +
-    emv("59", name) +
-    emv("60", city) +
-    emv("62", emv("05", txId)) +
-    "6304";
-  return payload + crc16(payload);
-}
 
 // ── CARRINHO ──────────────────────────────────────────────
 export function CartScreen() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { items, total, updateQty, removeItem, storeId, storeName, clearCart } =
-    useCart();
+  const { items, total, updateQty, storeId, storeName, clearCart } = useCart();
   const { addresses, loading: addrLoading } = useCustomerAddresses(
     user?.id ?? null,
   );
@@ -118,7 +85,6 @@ export function CartScreen() {
       return;
     }
     if (submitting) return;
-
     setSubmitting(true);
     try {
       const { data: store } = await supabase
@@ -130,7 +96,6 @@ export function CartScreen() {
       const minOrder = Number(store?.min_order_value ?? 0);
       const subtotal = total;
       const orderTotal = subtotal + delivFee;
-
       if (subtotal < minOrder && minOrder > 0) {
         showToast(`Pedido mínimo é R$ ${minOrder.toFixed(2)}`, "error");
         setSubmitting(false);
@@ -149,7 +114,6 @@ export function CartScreen() {
         .maybeSingle();
 
       if (existingOrder) {
-        // Pedido pending aguardando pagamento — reutiliza
         navigate("/payment", {
           state: {
             orderId: existingOrder.id,
@@ -202,7 +166,6 @@ export function CartScreen() {
       );
       if (itemsErr) throw new Error(itemsErr.message);
 
-      // Notifica comércio via WhatsApp
       notify.orderCreated(order.id);
 
       if (paymentMethod === "pix_qr" || paymentMethod === "credito_mp") {
@@ -294,34 +257,45 @@ export function CartScreen() {
         paddingBottom: 100,
       }}
     >
-      <div style={{ background: colors.noite, padding: "16px 20px 18px" }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            background: "none",
-            border: "none",
-            color: "rgba(255,255,255,0.35)",
-            fontSize: 13,
-            cursor: "pointer",
-            marginBottom: 10,
-            padding: 0,
-            fontFamily: "'Space Grotesk', sans-serif",
-          }}
+      <div style={{ background: colors.noite }}>
+        <div
+          style={{ maxWidth: 520, margin: "0 auto", padding: "16px 20px 18px" }}
         >
-          ← Continuar comprando
-        </button>
-        <p style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>
-          Meu Carrinho
-        </p>
-        <p
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}
-        >
-          {storeName} · {items.reduce((s, i) => s + i.quantity, 0)} itens
-        </p>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255,255,255,0.35)",
+              fontSize: 13,
+              cursor: "pointer",
+              marginBottom: 10,
+              padding: 0,
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            ← Continuar comprando
+          </button>
+          <p style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>
+            Meu Carrinho
+          </p>
+          <p
+            style={{
+              fontSize: 11,
+              color: "rgba(255,255,255,0.4)",
+              marginTop: 2,
+            }}
+          >
+            {storeName} · {items.reduce((s, i) => s + i.quantity, 0)} itens
+          </p>
+        </div>
       </div>
 
       <div
         style={{
+          maxWidth: 520,
+          margin: "0 auto",
+          width: "100%",
           padding: "14px 16px",
           display: "flex",
           flexDirection: "column",
@@ -721,7 +695,6 @@ export function CartScreen() {
                 label: "Dinheiro",
                 sub: "Pague na entrega — comércio confirma",
               },
-
               {
                 id: "credito_ent",
                 icon: "💳",
@@ -1277,7 +1250,7 @@ export function PaymentScreen() {
     );
   }
 
-  // Pagamento na entrega (dinheiro, crédito/débito)
+  // Pagamento na entrega
   const isEntrega =
     paymentMethod === "dinheiro" ||
     paymentMethod === "credito_ent" ||
@@ -1425,33 +1398,44 @@ export function PaymentScreen() {
         fontFamily: "'Space Grotesk', sans-serif",
       }}
     >
-      <div style={{ background: colors.noite, padding: "16px 20px 18px" }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            background: "none",
-            border: "none",
-            color: "rgba(255,255,255,0.35)",
-            fontSize: 13,
-            cursor: "pointer",
-            marginBottom: 10,
-            padding: 0,
-            fontFamily: "'Space Grotesk', sans-serif",
-          }}
+      <div style={{ background: colors.noite }}>
+        <div
+          style={{ maxWidth: 520, margin: "0 auto", padding: "16px 20px 18px" }}
         >
-          ← Voltar
-        </button>
-        <p style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>
-          Pagamento
-        </p>
-        <p
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}
-        >
-          Escaneie o QR Code para pagar via Pix
-        </p>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255,255,255,0.35)",
+              fontSize: 13,
+              cursor: "pointer",
+              marginBottom: 10,
+              padding: 0,
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            ← Voltar
+          </button>
+          <p style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>
+            Pagamento
+          </p>
+          <p
+            style={{
+              fontSize: 11,
+              color: "rgba(255,255,255,0.4)",
+              marginTop: 2,
+            }}
+          >
+            Escaneie o QR Code para pagar via Pix
+          </p>
+        </div>
       </div>
       <div
         style={{
+          maxWidth: 520,
+          margin: "0 auto",
+          width: "100%",
           padding: "20px 16px",
           display: "flex",
           flexDirection: "column",

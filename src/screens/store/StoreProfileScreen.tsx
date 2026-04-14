@@ -105,9 +105,7 @@ export default function StoreProfileScreen() {
           justifyContent: "center",
         }}
       >
-        <div style={{ maxWidth: 520, margin: "0 auto" }}>
-          <Spinner color={colors.rosa} />
-        </div>
+        <Spinner color={colors.rosa} />
       </div>
     );
 

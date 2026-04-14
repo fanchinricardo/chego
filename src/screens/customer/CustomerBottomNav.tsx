@@ -18,45 +18,52 @@ export function CustomerBottomNav({
       style={{
         position: "fixed",
         bottom: 0,
-        left: "50%",
-        transform: "translateX(-50%)",
-        width: "100%",
-        maxWidth: 480,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        display: "flex",
+        justifyContent: "center",
         background: "#fff",
         borderTop: `1px solid ${colors.bordaLilas}`,
-        display: "flex",
-        padding: "8px 0 20px",
-        zIndex: 100,
       }}
     >
-      {items.map((item) => (
-        <button
-          key={item.key}
-          onClick={() => navigate(item.path)}
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 3,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          <span style={{ fontSize: 20 }}>{item.icon}</span>
-          <span
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 520,
+          display: "flex",
+          padding: "8px 0 20px",
+        }}
+      >
+        {items.map((item) => (
+          <button
+            key={item.key}
+            onClick={() => navigate(item.path)}
             style={{
-              fontSize: 10,
-              fontWeight: 600,
-              color: active === item.key ? colors.rosa : "#aaa",
-              fontFamily: "'Space Grotesk', sans-serif",
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 3,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
             }}
           >
-            {item.label}
-          </span>
-        </button>
-      ))}
+            <span style={{ fontSize: 20 }}>{item.icon}</span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: active === item.key ? colors.rosa : "#aaa",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              {item.label}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

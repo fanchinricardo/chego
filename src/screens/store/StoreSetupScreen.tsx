@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { colors, Input, Button, StepBar, Toast } from "../../components/ui";
 import { LocationPicker } from "../../components/LocationPicker";
+import { geocodeAddress } from "../../hooks/routing";
 
 interface StoreGroup {
   id: string;
@@ -232,56 +233,49 @@ export default function StoreSetupScreen() {
     >
       {/* Header */}
       <div style={{ background: colors.noite }}>
-        <div
-          style={{ maxWidth: 520, margin: "0 auto", padding: "16px 20px 24px" }}
+        {step > 0 && (
+          <button
+            onClick={() => setStep((s) => (s - 1) as 0 | 1 | 2)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "rgba(255,255,255,0.35)",
+              fontSize: 13,
+              fontFamily: "'Space Grotesk', sans-serif",
+              marginBottom: 12,
+              padding: 0,
+            }}
+          >
+            ← Voltar
+          </button>
+        )}
+
+        <StepBar total={3} current={step} />
+
+        <p
+          style={{
+            fontSize: 11,
+            color: "rgba(255,255,255,0.3)",
+            marginBottom: 6,
+            marginTop: 8,
+          }}
         >
-          {step > 0 && (
-            <button
-              onClick={() => setStep((s) => (s - 1) as 0 | 1 | 2)}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "rgba(255,255,255,0.35)",
-                fontSize: 13,
-                fontFamily: "'Space Grotesk', sans-serif",
-                marginBottom: 12,
-                padding: 0,
-              }}
-            >
-              ← Voltar
-            </button>
-          )}
-
-          <StepBar total={3} current={step} />
-
-          <p
-            style={{
-              fontSize: 11,
-              color: "rgba(255,255,255,0.3)",
-              marginBottom: 6,
-              marginTop: 8,
-            }}
-          >
-            Passo {step + 1} de 3
-          </p>
-          <p
-            style={{
-              fontSize: 22,
-              fontWeight: 700,
-              color: "#fff",
-              lineHeight: 1.2,
-            }}
-          >
-            {STEP_TITLES[step].title}{" "}
-            <span style={{ color: colors.rosa }}>
-              {STEP_TITLES[step].accent}
-            </span>
-          </p>
-        </div>
-        {/* fecha maxWidth */}
+          Passo {step + 1} de 3
+        </p>
+        <p
+          style={{
+            fontSize: 22,
+            fontWeight: 700,
+            color: "#fff",
+            lineHeight: 1.2,
+          }}
+        >
+          {STEP_TITLES[step].title}{" "}
+          <span style={{ color: colors.rosa }}>{STEP_TITLES[step].accent}</span>
+        </p>
       </div>
-      {/* fecha background noite */}
+      {/* fecha maxWidth */}
 
       {/* Corpo */}
       <div

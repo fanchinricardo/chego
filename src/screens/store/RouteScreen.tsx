@@ -64,7 +64,7 @@ export default function RouteScreen() {
       }}
     >
       {/* Header */}
-      <div style={{ background: colors.noite, padding: "16px 20px 18px" }}>
+      <div style={{ background: colors.noite }}>
         <p
           style={{
             fontSize: 18,
@@ -530,19 +530,13 @@ export function RouteLiveScreen() {
       }}
     >
       {/* Header */}
-      <div
-        style={{
-          background: colors.noite,
-          padding: "16px 20px 18px",
-          color: "#fff",
-        }}
-      >
+      <div style={{ background: colors.noite }}>
         <button
           onClick={() => navigate(-1)}
           style={{
             background: "none",
             border: "none",
-            color: "#fff",
+            color: "rgba(255,255,255,0.35)",
             fontSize: 13,
             cursor: "pointer",
             marginBottom: 10,

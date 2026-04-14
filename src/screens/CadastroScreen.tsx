@@ -198,53 +198,46 @@ export default function CadastroScreen() {
     >
       {/* ── Header ── */}
       <div style={{ background: colors.noite }}>
-        <div
-          style={{ maxWidth: 520, margin: "0 auto", padding: "20px 24px 28px" }}
+        <button
+          onClick={back}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "rgba(255,255,255,0.35)",
+            fontSize: 13,
+            fontFamily: "'Space Grotesk', sans-serif",
+            marginBottom: 14,
+            padding: 0,
+          }}
         >
-          <button
-            onClick={back}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "rgba(255,255,255,0.35)",
-              fontSize: 13,
-              fontFamily: "'Space Grotesk', sans-serif",
-              marginBottom: 14,
-              padding: 0,
-            }}
-          >
-            ← Voltar
-          </button>
+          ← Voltar
+        </button>
 
-          <StepBar total={3} current={step} />
+        <StepBar total={3} current={step} />
 
-          <p
-            style={{
-              fontSize: 11,
-              color: "rgba(255,255,255,0.3)",
-              marginBottom: 6,
-            }}
-          >
-            Passo {step + 1} de 3
-          </p>
-          <p
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: "#fff",
-              lineHeight: 1.2,
-            }}
-          >
-            {STEP_TITLES[step].title}{" "}
-            <span style={{ color: colors.rosa }}>
-              {STEP_TITLES[step].accent}
-            </span>
-          </p>
-        </div>
-        {/* fecha maxWidth header */}
+        <p
+          style={{
+            fontSize: 11,
+            color: "rgba(255,255,255,0.3)",
+            marginBottom: 6,
+          }}
+        >
+          Passo {step + 1} de 3
+        </p>
+        <p
+          style={{
+            fontSize: 24,
+            fontWeight: 700,
+            color: "#fff",
+            lineHeight: 1.2,
+          }}
+        >
+          {STEP_TITLES[step].title}{" "}
+          <span style={{ color: colors.rosa }}>{STEP_TITLES[step].accent}</span>
+        </p>
       </div>
-      {/* fecha background noite */}
+      {/* fecha maxWidth header */}
 
       {/* ── Corpo ── */}
       <div

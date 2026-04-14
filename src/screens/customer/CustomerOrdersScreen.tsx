@@ -16,7 +16,6 @@ const STATUS_LABEL: Record<string, string> = {
   delivered: "Entregue",
   cancelled: "Cancelado",
 };
-
 const STATUS_STEPS = [
   "confirmed",
   "preparing",
@@ -40,19 +39,30 @@ export function CustomerOrdersScreen() {
         paddingBottom: 80,
       }}
     >
-      <div style={{ background: colors.noite, padding: "16px 20px 18px" }}>
-        <p style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>
-          Meus Pedidos
-        </p>
-        <p
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}
+      <div style={{ background: colors.noite }}>
+        <div
+          style={{ maxWidth: 520, margin: "0 auto", padding: "16px 20px 18px" }}
         >
-          Histórico de compras
-        </p>
+          <p style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>
+            Meus Pedidos
+          </p>
+          <p
+            style={{
+              fontSize: 11,
+              color: "rgba(255,255,255,0.4)",
+              marginTop: 2,
+            }}
+          >
+            Histórico de compras
+          </p>
+        </div>
       </div>
 
       <div
         style={{
+          maxWidth: 520,
+          margin: "0 auto",
+          width: "100%",
           padding: "14px 16px",
           display: "flex",
           flexDirection: "column",
@@ -211,8 +221,6 @@ export function CustomerOrdersScreen() {
                 <p style={{ fontSize: 10, color: "#bbb", marginTop: 3 }}>
                   {time}
                 </p>
-
-                {/* Barra de progresso */}
                 {isActive && order.status !== "pending" && (
                   <div style={{ display: "flex", gap: 3, marginTop: 8 }}>
                     {STATUS_STEPS.map((s, i) => (
@@ -261,7 +269,6 @@ export function CustomerTrackingScreen() {
 
   useEffect(() => {
     if (!id) return;
-
     supabase
       .from("orders")
       .select(
@@ -271,34 +278,17 @@ export function CustomerTrackingScreen() {
       .single()
       .then(async ({ data }) => {
         setOrder(data);
-
-        // Busca rota associada
         if (data?.status === "in_delivery") {
-          const { data: delivery, error: delErr } = await supabase
+          const { data: delivery } = await supabase
             .from("deliveries")
             .select("route_id")
             .eq("order_id", id)
             .maybeSingle();
-
-          console.log("🚚 delivery encontrado:", delivery, "erro:", delErr);
-          if (delivery?.route_id) {
-            console.log("✅ routeId definido:", delivery.route_id);
-            setRouteId(delivery.route_id);
-          } else {
-            console.warn("❌ nenhum delivery encontrado para order_id:", id);
-          }
-        } else {
-          console.log(
-            "ℹ️ status do pedido:",
-            data?.status,
-            "— não buscando rota",
-          );
+          if (delivery?.route_id) setRouteId(delivery.route_id);
         }
-
         setLoading(false);
       });
 
-    // Realtime: atualiza status do pedido
     const channel = supabase
       .channel(`customer-track-${id}`)
       .on(
@@ -310,30 +300,21 @@ export function CustomerTrackingScreen() {
           filter: `id=eq.${id}`,
         },
         (payload) => {
-          console.log("📦 Realtime order update:", payload.new);
           setOrder((prev: any) => (prev ? { ...prev, ...payload.new } : prev));
         },
       )
-      .subscribe((status) => {
-        console.log("🔌 Realtime status:", status);
-      });
+      .subscribe();
 
-    // Polling a cada 5s como fallback caso Realtime falhe
     const polling = setInterval(async () => {
       const { data } = await supabase
         .from("orders")
         .select("status, payment_status")
         .eq("id", id)
         .single();
-      if (data) {
-        setOrder((prev: any) => {
-          if (prev && prev.status !== data.status) {
-            console.log("🔄 Polling detectou mudança:", data.status);
-            return { ...prev, ...data };
-          }
-          return prev;
-        });
-      }
+      if (data)
+        setOrder((prev: any) =>
+          prev && prev.status !== data.status ? { ...prev, ...data } : prev,
+        );
     }, 5000);
 
     return () => {
@@ -350,8 +331,6 @@ export function CustomerTrackingScreen() {
     setLastGpsUpdate(
       diff < 60 ? `${diff}s atrás` : `${Math.round(diff / 60)}min atrás`,
     );
-
-    // Atualiza marcador no mapa se já inicializado
     if (mapObjRef.current && markerRef.current && gps.lat && gps.lng) {
       markerRef.current.setLatLng([gps.lat, gps.lng]);
       mapObjRef.current.panTo([gps.lat, gps.lng], {
@@ -359,85 +338,59 @@ export function CustomerTrackingScreen() {
         duration: 1,
       });
     }
-
-    // Calcula ETA via OSRM se tiver coordenadas do destino
-    const destLat = order?.delivery_lat;
-    const destLng = order?.delivery_lng;
+    const destLat = order?.delivery_lat,
+      destLng = order?.delivery_lng;
     if (destLat && destLng && gps.lat && gps.lng) {
       fetch(
         `https://router.project-osrm.org/route/v1/driving/${gps.lng},${gps.lat};${destLng},${destLat}?overview=false`,
       )
         .then((r) => r.json())
         .then((d) => {
-          if (d.routes?.[0]?.duration) {
+          if (d.routes?.[0]?.duration)
             setEta(Math.ceil(d.routes[0].duration / 60));
-          }
         })
         .catch(() => {
-          // Calcula distância em linha reta como fallback (Haversine)
-          const R = 6371;
-          const dLat = ((destLat - gps.lat) * Math.PI) / 180;
-          const dLng = ((destLng - gps.lng) * Math.PI) / 180;
+          const R = 6371,
+            dLat = ((destLat - gps.lat) * Math.PI) / 180,
+            dLng = ((destLng - gps.lng) * Math.PI) / 180;
           const a =
             Math.sin(dLat / 2) ** 2 +
             Math.cos((gps.lat * Math.PI) / 180) *
               Math.cos((destLat * Math.PI) / 180) *
               Math.sin(dLng / 2) ** 2;
-          const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          setEta(Math.ceil(km / 0.5)); // ~30km/h em cidade
+          setEta(
+            Math.ceil(
+              (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 0.5,
+            ),
+          );
         });
     }
   }, [gps]);
 
-  // Inicializa o mapa Leaflet quando GPS chega
   useEffect(() => {
     if (!mapRef.current || !gps || mapReady.current) return;
     mapReady.current = true;
-
     const initMap = () => {
       const L = (window as any).L;
       if (!L) return;
-
       const map = L.map(mapRef.current, {
         center: [gps.lat, gps.lng],
         zoom: 15,
         zoomControl: true,
         attributionControl: false,
       });
-
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(
         map,
       );
-
-      // Ícone motoboy
       const motoIcon = L.divIcon({
-        html: `<div style="
-          width:40px;height:40px;border-radius:50%;
-          background:#e91e8c;border:3px solid #fff;
-          display:flex;align-items:center;justify-content:center;
-          font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.4);
-        ">🏍️</div>`,
+        html: `<div style="width:40px;height:40px;border-radius:50%;background:#e91e8c;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.4);">🏍️</div>`,
         iconSize: [40, 40],
         iconAnchor: [20, 20],
         className: "",
       });
-
       markerRef.current = L.marker([gps.lat, gps.lng], { icon: motoIcon })
         .addTo(map)
         .bindPopup("Motoboy");
-
-      // Círculo de precisão do GPS
-      if (gps.accuracy) {
-        L.circle([gps.lat, gps.lng], {
-          radius: gps.accuracy,
-          color: "#e91e8c",
-          fillColor: "#e91e8c",
-          fillOpacity: 0.1,
-          weight: 1,
-        }).addTo(map);
-      }
-
-      // Marcador de destino (endereço do cliente) se tiver coordenadas
       if (order?.delivery_lat && order?.delivery_lng) {
         const destIcon = L.divIcon({
           html: `<div style="font-size:28px;line-height:1;">📍</div>`,
@@ -448,22 +401,19 @@ export function CustomerTrackingScreen() {
         L.marker([order.delivery_lat, order.delivery_lng], { icon: destIcon })
           .addTo(map)
           .bindPopup("Seu endereço");
-
-        // Ajusta o mapa para mostrar motoboy e destino
-        const bounds = L.latLngBounds(
-          [gps.lat, gps.lng],
-          [order.delivery_lat, order.delivery_lng],
+        map.fitBounds(
+          L.latLngBounds(
+            [gps.lat, gps.lng],
+            [order.delivery_lat, order.delivery_lng],
+          ),
+          { padding: [40, 40] },
         );
-        map.fitBounds(bounds, { padding: [40, 40] });
       }
-
       mapObjRef.current = map;
     };
-
     if ((window as any).L) {
       initMap();
     } else {
-      // Carrega Leaflet se ainda não carregado
       if (!document.querySelector('link[href*="leaflet"]')) {
         const link = document.createElement("link");
         link.rel = "stylesheet";
@@ -475,11 +425,8 @@ export function CustomerTrackingScreen() {
         script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
         script.onload = initMap;
         document.head.appendChild(script);
-      } else {
-        setTimeout(initMap, 500);
-      }
+      } else setTimeout(initMap, 500);
     }
-
     return () => {
       mapObjRef.current?.remove();
       mapObjRef.current = null;
@@ -531,57 +478,68 @@ export function CustomerTrackingScreen() {
         paddingBottom: 24,
       }}
     >
-      <div style={{ background: colors.noite, padding: "16px 20px 18px" }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            background: "none",
-            border: "none",
-            color: "rgba(255,255,255,0.35)",
-            fontSize: 13,
-            cursor: "pointer",
-            marginBottom: 10,
-            padding: 0,
-            fontFamily: "'Space Grotesk', sans-serif",
-          }}
+      <div style={{ background: colors.noite }}>
+        <div
+          style={{ maxWidth: 520, margin: "0 auto", padding: "16px 20px 18px" }}
         >
-          ← Meus pedidos
-        </button>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <p style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>
-            {isDelivered
-              ? "✓ Entregue!"
-              : (STATUS_LABEL[order.status] ?? "Pedido")}
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255,255,255,0.35)",
+              fontSize: 13,
+              cursor: "pointer",
+              marginBottom: 10,
+              padding: 0,
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            ← Meus pedidos
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <p style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>
+              {isDelivered
+                ? "✓ Entregue!"
+                : (STATUS_LABEL[order.status] ?? "Pedido")}
+            </p>
+            {isDelivery && (
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: colors.rosa,
+                  animation: "chegô-blink 1s ease-in-out infinite",
+                }}
+              />
+            )}
+          </div>
+          <p
+            style={{
+              fontSize: 11,
+              color: "rgba(255,255,255,0.4)",
+              marginTop: 2,
+            }}
+          >
+            {order.stores?.name}{" "}
+            {gps && isDelivery ? `· GPS ${lastGpsUpdate}` : ""}
           </p>
-          {isDelivery && (
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: colors.rosa,
-                animation: "chegô-blink 1s ease-in-out infinite",
-              }}
-            />
-          )}
         </div>
-        <p
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}
-        >
-          {order.stores?.name}{" "}
-          {gps && isDelivery ? `· GPS ${lastGpsUpdate}` : ""}
-        </p>
       </div>
 
       <div
         style={{
+          maxWidth: 520,
+          margin: "0 auto",
+          width: "100%",
           padding: "14px 16px",
           display: "flex",
           flexDirection: "column",
           gap: 12,
         }}
       >
-        {/* Mapa GPS real com Leaflet */}
+        {/* Mapa GPS */}
         {(isDelivery || isDelivered) && (
           <div
             style={{
@@ -591,10 +549,7 @@ export function CustomerTrackingScreen() {
               height: 220,
             }}
           >
-            {/* Mapa Leaflet */}
             <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
-
-            {/* Overlay enquanto aguarda GPS */}
             {!gps && (
               <div
                 style={{
@@ -622,8 +577,6 @@ export function CustomerTrackingScreen() {
                 </p>
               </div>
             )}
-
-            {/* Badge GPS atualizado */}
             {gps && (
               <div
                 style={{
@@ -656,7 +609,7 @@ export function CustomerTrackingScreen() {
           </div>
         )}
 
-        {/* Barra de progresso de status */}
+        {/* Barra de progresso */}
         <div
           style={{
             background: "#fff",
@@ -682,7 +635,7 @@ export function CustomerTrackingScreen() {
                     borderRadius: "50%",
                     flexShrink: 0,
                     background: i <= stepIdx ? colors.rosa : colors.bordaLilas,
-                    border: i === stepIdx ? `2px solid #fff` : "none",
+                    border: i === stepIdx ? "2px solid #fff" : "none",
                     outline:
                       i === stepIdx ? `2px solid ${colors.rosa}` : "none",
                     animation:
@@ -800,7 +753,97 @@ export function CustomerTrackingScreen() {
           </div>
         )}
 
-        {/* Itens do pedido */}
+        {/* Pagamento */}
+        {(() => {
+          const PAYMENT_LABEL: Record<string, string> = {
+            pix_qr: "⚡ Pix QR Code",
+            pix_manual: "📋 Pix Manual",
+            dinheiro: "💵 Dinheiro",
+            credito_mp: "💳 Crédito online",
+            credito_ent: "💳 Cartão de crédito",
+            debito_ent: "💳 Cartão de débito",
+          };
+          const method = order.payment_method ?? "pix_qr";
+          const isPaid = order.payment_status === "paid";
+          const isOnline = method === "pix_qr" || method === "credito_mp";
+          return (
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 13,
+                border: `1px solid ${colors.bordaLilas}`,
+                padding: "12px 14px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div>
+                <p
+                  style={{
+                    fontSize: 10,
+                    color: "#aaa",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    marginBottom: 3,
+                  }}
+                >
+                  Pagamento
+                </p>
+                <p
+                  style={{ fontSize: 13, fontWeight: 600, color: colors.noite }}
+                >
+                  {PAYMENT_LABEL[method] ?? method}
+                </p>
+              </div>
+              {isPaid ? (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "4px 10px",
+                    borderRadius: 10,
+                    background: "#f0fdf4",
+                    color: "#15803d",
+                    border: "1px solid #86efac",
+                  }}
+                >
+                  ✓ Pago
+                </span>
+              ) : isOnline ? (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "4px 10px",
+                    borderRadius: 10,
+                    background: "#fff8e6",
+                    color: "#b45309",
+                    border: "1px solid #fcd34d",
+                  }}
+                >
+                  Aguardando
+                </span>
+              ) : (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "4px 10px",
+                    borderRadius: 10,
+                    background: colors.lilasClaro,
+                    color: "#7e22ce",
+                    border: `1px solid ${colors.bordaLilas}`,
+                  }}
+                >
+                  Na entrega
+                </span>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Itens */}
         <div
           style={{
             background: "#fff",
@@ -865,10 +908,7 @@ export function CustomerTrackingScreen() {
         </div>
       </div>
 
-      <style>{`
-        @keyframes chegô-blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-        @keyframes chegô-ring  { 0%{transform:scale(0.8);opacity:0.8} 100%{transform:scale(2.2);opacity:0} }
-      `}</style>
+      <style>{`@keyframes chegô-blink{0%,100%{opacity:1}50%{opacity:0.3}} @keyframes chegô-ring{0%{transform:scale(0.8);opacity:0.8}100%{transform:scale(2.2);opacity:0}}`}</style>
     </div>
   );
 }

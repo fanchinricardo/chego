@@ -289,7 +289,7 @@ export default function CustomerStoreScreen() {
           <Spinner color={colors.rosa} />
         </div>
       ) : (
-        <div style={{ padding: "12px 16px" }}>
+        <div style={{ maxWidth: 520, margin: "0 auto", padding: "12px 16px" }}>
           {Object.entries(groupedProducts).map(([cat, prods]) => (
             <div key={cat} style={{ marginBottom: 20 }}>
               <p

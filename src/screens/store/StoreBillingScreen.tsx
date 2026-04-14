@@ -249,7 +249,7 @@ export default function StoreBillingScreen() {
       }}
     >
       {/* Header */}
-      <div style={{ background: colors.noite, padding: "16px 20px 20px" }}>
+      <div style={{ background: colors.noite }}>
         <button
           onClick={() => navigate(-1)}
           style={{

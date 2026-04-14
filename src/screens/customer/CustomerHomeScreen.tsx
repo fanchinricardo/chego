@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCart } from "../../contexts/CartContext";
@@ -13,7 +13,7 @@ import { CustomerBottomNav } from "./CustomerBottomNav";
 export default function CustomerHomeScreen() {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { itemCount, storeId: cartStoreId } = useCart();
+  const { itemCount } = useCart();
 
   const [selectedGroup, setSelectedGroup] = useState<string | undefined>(
     undefined,
@@ -31,7 +31,6 @@ export default function CustomerHomeScreen() {
     setSearch(e.target.value);
     setSearchActive(e.target.value.length > 1);
   }
-
   function clearSearch() {
     setSearch("");
     setSearchActive(false);
@@ -50,27 +49,66 @@ export default function CustomerHomeScreen() {
       }}
     >
       {/* Header */}
-      <div style={{ background: colors.noite, padding: "16px 20px 14px" }}>
+      <div style={{ background: colors.noite }}>
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 6,
-          }}
+          style={{ maxWidth: 520, margin: "0 auto", padding: "16px 20px 14px" }}
         >
-          <Logo size={24} />
-          <div style={{ display: "flex", gap: 8 }}>
-            {/* Badge de carrinho */}
-            {itemCount > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 6,
+            }}
+          >
+            <Logo size={24} />
+            <div style={{ display: "flex", gap: 8 }}>
+              {itemCount > 0 && (
+                <button
+                  onClick={() => navigate("/cart")}
+                  style={{
+                    position: "relative",
+                    width: 34,
+                    height: 34,
+                    borderRadius: "50%",
+                    background: "rgba(233,30,140,0.15)",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  🛒
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -2,
+                      right: -2,
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      background: colors.rosa,
+                      color: "#fff",
+                      fontSize: 9,
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {itemCount}
+                  </span>
+                </button>
+              )}
               <button
-                onClick={() => navigate("/cart")}
+                onClick={() => navigate("/profile")}
                 style={{
-                  position: "relative",
                   width: 34,
                   height: 34,
                   borderRadius: "50%",
-                  background: "rgba(233,30,140,0.15)",
+                  background: "rgba(233,30,140,0.12)",
                   border: "none",
                   cursor: "pointer",
                   fontSize: 16,
@@ -79,100 +117,61 @@ export default function CustomerHomeScreen() {
                   justifyContent: "center",
                 }}
               >
-                🛒
-                <span
-                  style={{
-                    position: "absolute",
-                    top: -2,
-                    right: -2,
-                    width: 16,
-                    height: 16,
-                    borderRadius: "50%",
-                    background: colors.rosa,
-                    color: "#fff",
-                    fontSize: 9,
-                    fontWeight: 700,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {itemCount}
-                </span>
+                👤
               </button>
-            )}
-            <button
-              onClick={() => navigate("/profile")}
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: "50%",
-                background: "rgba(233,30,140,0.12)",
-                border: "none",
-                cursor: "pointer",
-                fontSize: 16,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              👤
-            </button>
+            </div>
           </div>
-        </div>
-
-        <p
-          style={{
-            fontSize: 10,
-            color: "rgba(255,255,255,0.35)",
-            marginBottom: 10,
-          }}
-        >
-          Olá, {profile?.full_name?.split(" ")[0]} 👋
-        </p>
-
-        {/* Barra de busca */}
-        <div style={{ display: "flex", gap: 8 }}>
-          <div
+          <p
             style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              background: "rgba(255,255,255,0.08)",
-              borderRadius: 10,
-              padding: "9px 12px",
+              fontSize: 10,
+              color: "rgba(255,255,255,0.35)",
+              marginBottom: 10,
             }}
           >
-            <span style={{ fontSize: 14, flexShrink: 0 }}>🔍</span>
-            <input
-              value={search}
-              onChange={handleSearch}
-              placeholder="Buscar comércio ou produto..."
+            Olá, {profile?.full_name?.split(" ")[0]} 👋
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div
               style={{
                 flex: 1,
-                background: "none",
-                border: "none",
-                outline: "none",
-                color: "#fff",
-                fontSize: 13,
-                fontFamily: "'Space Grotesk', sans-serif",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "rgba(255,255,255,0.08)",
+                borderRadius: 10,
+                padding: "9px 12px",
               }}
-            />
-            {search && (
-              <button
-                onClick={clearSearch}
+            >
+              <span style={{ fontSize: 14, flexShrink: 0 }}>🔍</span>
+              <input
+                value={search}
+                onChange={handleSearch}
+                placeholder="Buscar comércio ou produto..."
                 style={{
+                  flex: 1,
                   background: "none",
                   border: "none",
-                  color: "rgba(255,255,255,0.3)",
-                  cursor: "pointer",
-                  fontSize: 14,
+                  outline: "none",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontFamily: "'Space Grotesk', sans-serif",
                 }}
-              >
-                ✕
-              </button>
-            )}
+              />
+              {search && (
+                <button
+                  onClick={clearSearch}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "rgba(255,255,255,0.3)",
+                    cursor: "pointer",
+                    fontSize: 14,
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -180,6 +179,8 @@ export default function CustomerHomeScreen() {
       {/* Categorias */}
       <div
         style={{
+          maxWidth: 520,
+          margin: "0 auto",
           display: "flex",
           gap: 8,
           padding: "12px 16px",
@@ -206,86 +207,87 @@ export default function CustomerHomeScreen() {
       </div>
 
       {/* Conteúdo */}
-      {loading ? (
-        <div style={{ padding: 40, textAlign: "center" }}>
-          <Spinner color={colors.rosa} />
-        </div>
-      ) : stores.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "48px 24px" }}>
-          <p style={{ fontSize: 32, marginBottom: 12 }}>🏪</p>
-          <p style={{ fontSize: 15, fontWeight: 700, color: colors.noite }}>
-            Nenhum comércio encontrado
-          </p>
-          <p style={{ fontSize: 13, color: "#aaa", marginTop: 6 }}>
-            Tente outro filtro ou busca
-          </p>
-        </div>
-      ) : (
-        <div style={{ padding: "0 16px" }}>
-          {openStores.length > 0 && (
-            <>
-              <p
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#aaa",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  marginBottom: 10,
-                  marginTop: 4,
-                }}
-              >
-                Abertos agora ({openStores.length})
-              </p>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  marginBottom: 20,
-                }}
-              >
-                {openStores.map((s) => (
-                  <StoreCard
-                    key={s.id}
-                    store={s}
-                    onPress={() => navigate(`/loja/${s.id}`)}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-
-          {closedStores.length > 0 && (
-            <>
-              <p
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#aaa",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  marginBottom: 10,
-                }}
-              >
-                Fechados
-              </p>
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 10 }}
-              >
-                {closedStores.map((s) => (
-                  <StoreCard
-                    key={s.id}
-                    store={s}
-                    onPress={() => navigate(`/loja/${s.id}`)}
-                    closed
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
+      <div style={{ maxWidth: 520, margin: "0 auto" }}>
+        {loading ? (
+          <div style={{ padding: 40, textAlign: "center" }}>
+            <Spinner color={colors.rosa} />
+          </div>
+        ) : stores.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 24px" }}>
+            <p style={{ fontSize: 32, marginBottom: 12 }}>🏪</p>
+            <p style={{ fontSize: 15, fontWeight: 700, color: colors.noite }}>
+              Nenhum comércio encontrado
+            </p>
+            <p style={{ fontSize: 13, color: "#aaa", marginTop: 6 }}>
+              Tente outro filtro ou busca
+            </p>
+          </div>
+        ) : (
+          <div style={{ padding: "0 16px" }}>
+            {openStores.length > 0 && (
+              <>
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#aaa",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    marginBottom: 10,
+                    marginTop: 4,
+                  }}
+                >
+                  Abertos agora ({openStores.length})
+                </p>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    marginBottom: 20,
+                  }}
+                >
+                  {openStores.map((s) => (
+                    <StoreCard
+                      key={s.id}
+                      store={s}
+                      onPress={() => navigate(`/loja/${s.id}`)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+            {closedStores.length > 0 && (
+              <>
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#aaa",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    marginBottom: 10,
+                  }}
+                >
+                  Fechados
+                </p>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 10 }}
+                >
+                  {closedStores.map((s) => (
+                    <StoreCard
+                      key={s.id}
+                      store={s}
+                      onPress={() => navigate(`/loja/${s.id}`)}
+                      closed
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Barra do carrinho flutuante */}
       {itemCount > 0 && (
@@ -343,7 +345,6 @@ export default function CustomerHomeScreen() {
   );
 }
 
-// ── Pill de categoria ─────────────────────────────────────
 function CategoryPill({
   icon,
   label,
@@ -396,7 +397,6 @@ function CategoryPill({
   );
 }
 
-// ── Card de comércio ──────────────────────────────────────
 function StoreCard({
   store,
   onPress,
@@ -418,7 +418,6 @@ function StoreCard({
         opacity: closed ? 0.6 : 1,
       }}
     >
-      {/* Banner */}
       <div
         style={{
           height: 72,
@@ -465,8 +464,6 @@ function StoreCard({
           </span>
         )}
       </div>
-
-      {/* Info */}
       <div
         style={{
           padding: "8px 12px",

@@ -7,7 +7,6 @@ export default function SplashScreen() {
   const navigate = useNavigate();
   const { session, profile, loading } = useAuth();
 
-  // Redireciona se já logado
   useEffect(() => {
     if (loading) return;
     if (session && profile) {
@@ -30,17 +29,20 @@ export default function SplashScreen() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "56px 28px 44px",
         fontFamily: "'Space Grotesk', sans-serif",
       }}
     >
-      {/* ── Topo: logo + animação ── */}
       <div
         style={{
+          flex: 1,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
+          justifyContent: "center",
           gap: 8,
+          width: "100%",
+          maxWidth: 520,
+          padding: "56px 28px 0",
         }}
       >
         <Logo size={72} />
@@ -55,8 +57,6 @@ export default function SplashScreen() {
         >
           seu pedido esta aqui
         </p>
-
-        {/* Três pontinhos pulsantes */}
         <div style={{ display: "flex", gap: 7, marginTop: 20 }}>
           {[0, 0.2, 0.4].map((delay, i) => (
             <div
@@ -74,17 +74,13 @@ export default function SplashScreen() {
         </div>
       </div>
 
-      <style>{`
-        @keyframes chegô-pulse {
-          0%,100% { transform: scale(1); }
-          50%      { transform: scale(1.45); }
-        }
-      `}</style>
+      <style>{`@keyframes chegô-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.45)} }`}</style>
 
-      {/* ── Fundo: CTAs ── */}
       <div
         style={{
           width: "100%",
+          maxWidth: 520,
+          padding: "0 28px 44px",
           display: "flex",
           flexDirection: "column",
           gap: 10,
@@ -98,7 +94,6 @@ export default function SplashScreen() {
         >
           Entrar na conta
         </Button>
-
         <Button
           variant="outline"
           fullWidth
@@ -107,7 +102,6 @@ export default function SplashScreen() {
         >
           Criar conta grátis
         </Button>
-
         <p
           style={{
             textAlign: "center",
@@ -117,7 +111,7 @@ export default function SplashScreen() {
             marginTop: 6,
           }}
         >
-          Um aplicativo de RFSolutions{" "}
+          Um aplicativo de RFSolutions
         </p>
       </div>
     </div>
