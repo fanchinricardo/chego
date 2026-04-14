@@ -73,25 +73,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   async function loadOrCreateProfile(u: User) {
-    // 1. Tenta carregar o profile existente
+    // 1. Tenta carregar o profile existente — usa cast para evitar erro de enum
     for (let i = 0; i < 5; i++) {
       if (i > 0) await new Promise((r) => setTimeout(r, 800));
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, full_name, phone, role, created_at")
         .eq("id", u.id)
         .maybeSingle();
 
+      if (error) console.warn(`Tentativa ${i + 1}:`, error.message);
       if (data) {
-        setProfile(data as Profile);
+        setProfile(data as any);
         return;
       }
     }
 
-    // 2. Profile não existe — tenta criar via RPC
+    // 2. Profile não existe — cria via RPC
     const meta = u.user_metadata ?? {};
-    const validRoles = ["admin", "store", "customer", "motoboy"];
+    const validRoles = ["store", "customer", "motoboy"];
     const role = validRoles.includes(meta.role) ? meta.role : "customer";
     const full_name =
       meta.full_name?.trim() ||
@@ -108,8 +109,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       console.error("Erro ao criar profile:", error.message);
-      // Sessão inválida — desloga para limpar o cache
-      await supabase.auth.signOut();
       return;
     }
 
@@ -171,8 +170,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function sendPasswordReset(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
     });
     if (error) throw new Error(error.message);
   }
@@ -216,7 +216,7 @@ function translateAuthError(msg: string): string {
     "Invalid login credentials": "E-mail ou senha incorretos",
     "Email not confirmed": "Confirme seu e-mail antes de entrar",
     "User already registered": "Este e-mail já está cadastrado",
-    "Password should be at least 4": "Senha deve ter no mínimo 4 caracteres",
+    "Password should be at least 6": "Senha deve ter no mínimo 6 caracteres",
     "Phone number format is invalid": "Telefone inválido. Use DDI+DDD+número",
     "Token has expired": "Código expirado. Solicite um novo",
     "Invalid OTP": "Código inválido",

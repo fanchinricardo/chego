@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { colors, Input, Button, StepBar, Toast } from "../../components/ui";
-import { geocodeAddress } from "../../hooks/routing";
+import { LocationPicker } from "../../components/LocationPicker";
 
 interface StoreGroup {
   id: string;
@@ -55,6 +55,9 @@ export default function StoreSetupScreen() {
   const { user } = useAuth();
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [form, setForm] = useState<FormData>({ ...EMPTY });
+  const [showMap, setShowMap] = useState(false);
+  const [pickedLat, setPickedLat] = useState<number | null>(null);
+  const [pickedLng, setPickedLng] = useState<number | null>(null);
   const [groups, setGroups] = useState<StoreGroup[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -92,18 +95,37 @@ export default function StoreSetupScreen() {
 
   function validateStep1(): boolean {
     const e: Record<string, string> = {};
+
     if (!form.name.trim()) e.name = "Informe o nome da loja";
+    else if (form.name.trim().length < 3)
+      e.name = "Nome deve ter no mínimo 3 caracteres";
+
+    const phoneDigits = form.phone.replace(/\D/g, "");
     if (!form.phone.trim()) e.phone = "Informe o telefone";
+    else if (phoneDigits.length < 10) e.phone = "Informe o telefone com DDD";
+
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   function validateStep2(): boolean {
     const e: Record<string, string> = {};
+
     if (!form.address.trim()) e.address = "Informe o endereço";
+    else if (form.address.trim().length < 5) e.address = "Endereço muito curto";
+
     if (!form.city.trim()) e.city = "Informe a cidade";
+    else if (form.city.trim().length < 2) e.city = "Cidade inválida";
+
     if (!form.state.trim()) e.state = "Informe o estado (UF)";
+    else if (form.state.trim().length !== 2)
+      e.state = "Use a sigla do estado (ex: SP)";
+
+    const cepDigits = form.zip_code.replace(/\D/g, "");
     if (!form.zip_code.trim()) e.zip_code = "Informe o CEP";
+    else if (cepDigits.length !== 8)
+      e.zip_code = "CEP inválido (deve ter 8 dígitos)";
+
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -120,19 +142,21 @@ export default function StoreSetupScreen() {
     setSaving(true);
 
     try {
-      let lat: number | null = null;
-      let lng: number | null = null;
+      let lat: number | null = pickedLat;
+      let lng: number | null = pickedLng;
 
       try {
-        const geo = await geocodeAddress({
-          address: form.address.trim(),
-          city: form.city.trim(),
-          state: form.state.trim().toUpperCase().slice(0, 2),
-          zip_code: form.zip_code.replace(/\D/g, ""),
-        });
-        if (geo) {
-          lat = geo.lat;
-          lng = geo.lng;
+        if (!lat || !lng) {
+          const geo = await geocodeAddress({
+            address: form.address.trim(),
+            city: form.city.trim(),
+            state: form.state.trim().toUpperCase().slice(0, 2),
+            zip_code: form.zip_code.replace(/\D/g, ""),
+          });
+          if (geo) {
+            lat = geo.lat;
+            lng = geo.lng;
+          }
         }
       } catch {
         console.warn("Não foi possível geocodificar o endereço da loja");
@@ -152,16 +176,41 @@ export default function StoreSetupScreen() {
         delivery_fee: Number(form.delivery_fee) || 0,
         min_order_value: Number(form.min_order_value) || 0,
         estimated_time: Number(form.estimated_time) || 45,
-        active: true,
+        active: false,
         open_now: false,
         signup_paid: false,
       });
 
       if (error) throw new Error(error.message);
 
-      showToast("Loja cadastrada com sucesso!");
-      // Aguarda o toast aparecer antes de navegar
-      setTimeout(() => navigate("/store", { replace: true }), 1200);
+      // Cria fatura de adesão
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const { data: newStore } = await supabase
+        .from("stores")
+        .select("id")
+        .eq("owner_id", user.id)
+        .single();
+      if (newStore) {
+        await fetch(`${SUPABASE_URL}/functions/v1/store-billing`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token ?? SUPABASE_KEY}`,
+            apikey: SUPABASE_KEY,
+          },
+          body: JSON.stringify({
+            action: "create_signup_invoice",
+            store_id: newStore.id,
+          }),
+        });
+      }
+
+      showToast("Loja cadastrada! Pague a taxa de adesão para ativar.");
+      setTimeout(() => navigate("/store", { replace: true }), 1500);
     } catch (err: any) {
       showToast(err.message, "error");
     } finally {
@@ -182,54 +231,65 @@ export default function StoreSetupScreen() {
       }}
     >
       {/* Header */}
-      <div style={{ background: colors.noite, padding: "16px 20px 24px" }}>
-        {step > 0 && (
-          <button
-            onClick={() => setStep((s) => (s - 1) as 0 | 1 | 2)}
+      <div style={{ background: colors.noite }}>
+        <div
+          style={{ maxWidth: 520, margin: "0 auto", padding: "16px 20px 24px" }}
+        >
+          {step > 0 && (
+            <button
+              onClick={() => setStep((s) => (s - 1) as 0 | 1 | 2)}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "rgba(255,255,255,0.35)",
+                fontSize: 13,
+                fontFamily: "'Space Grotesk', sans-serif",
+                marginBottom: 12,
+                padding: 0,
+              }}
+            >
+              ← Voltar
+            </button>
+          )}
+
+          <StepBar total={3} current={step} />
+
+          <p
             style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "#fff",
-              fontSize: 13,
-              fontFamily: "'Space Grotesk', sans-serif",
-              marginBottom: 12,
-              padding: 0,
+              fontSize: 11,
+              color: "rgba(255,255,255,0.3)",
+              marginBottom: 6,
+              marginTop: 8,
             }}
           >
-            ← Voltar
-          </button>
-        )}
-
-        <StepBar total={3} current={step} />
-
-        <p
-          style={{
-            fontSize: 11,
-            color: "rgba(255,255,255,0.3)",
-            marginBottom: 6,
-            marginTop: 8,
-          }}
-        >
-          Passo {step + 1} de 3
-        </p>
-        <p
-          style={{
-            fontSize: 22,
-            fontWeight: 700,
-            color: "#fff",
-            lineHeight: 1.2,
-          }}
-        >
-          {STEP_TITLES[step].title}{" "}
-          <span style={{ color: colors.rosa }}>{STEP_TITLES[step].accent}</span>
-        </p>
+            Passo {step + 1} de 3
+          </p>
+          <p
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              color: "#fff",
+              lineHeight: 1.2,
+            }}
+          >
+            {STEP_TITLES[step].title}{" "}
+            <span style={{ color: colors.rosa }}>
+              {STEP_TITLES[step].accent}
+            </span>
+          </p>
+        </div>
+        {/* fecha maxWidth */}
       </div>
+      {/* fecha background noite */}
 
       {/* Corpo */}
       <div
         style={{
           flex: 1,
+          maxWidth: 520,
+          margin: "0 auto",
+          width: "100%",
           padding: "20px 20px 40px",
           display: "flex",
           flexDirection: "column",
@@ -446,6 +506,42 @@ export default function StoreSetupScreen() {
               inputMode="numeric"
             />
 
+            {/* Localização no mapa */}
+            <div>
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: colors.noite,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  marginBottom: 8,
+                }}
+              >
+                Localização no mapa
+              </p>
+              <button
+                onClick={() => setShowMap(true)}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: 12,
+                  border: `1.5px solid ${pickedLat ? "#22c55e" : colors.bordaLilas}`,
+                  background: pickedLat ? "#f0fdf4" : "#fff",
+                  color: pickedLat ? "#15803d" : "#888",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  textAlign: "left",
+                }}
+              >
+                {pickedLat
+                  ? `✅ Localização definida (${pickedLat.toFixed(4)}, ${pickedLng?.toFixed(4)})`
+                  : "📍 Marcar localização no mapa (opcional)"}
+              </button>
+            </div>
+
             <div style={{ height: 1, background: colors.bordaLilas }} />
 
             <p
@@ -500,6 +596,19 @@ export default function StoreSetupScreen() {
           </>
         )}
       </div>
+
+      {showMap && (
+        <LocationPicker
+          initialLat={pickedLat ?? -23.55}
+          initialLng={pickedLng ?? -46.63}
+          onConfirm={(lat, lng) => {
+            setPickedLat(lat);
+            setPickedLng(lng);
+            setShowMap(false);
+          }}
+          onClose={() => setShowMap(false)}
+        />
+      )}
 
       {toast && <Toast message={toast} type={toastType} />}
     </div>

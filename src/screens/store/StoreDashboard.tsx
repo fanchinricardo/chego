@@ -68,6 +68,14 @@ export default function StoreDashboard() {
 
   async function handleToggleOpen() {
     if (!store) return;
+    // Bloqueia se loja não está ativa (signup não pago ou inadimplente)
+    if (!store.active) {
+      showToast(
+        "⚠️ Pague a fatura em Perfil → Faturas para ativar sua loja.",
+        "error",
+      );
+      return;
+    }
     setToggling(true);
     try {
       await toggleOpen(!store.open_now);
@@ -291,6 +299,56 @@ export default function StoreDashboard() {
       </div>
 
       {/* Cards de resumo */}
+      {/* Banner inadimplência */}
+      {!store.active && (
+        <div
+          style={{
+            margin: "12px 16px 0",
+            padding: "12px 14px",
+            background: "#fef2f2",
+            border: "1px solid #fca5a5",
+            borderRadius: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <span style={{ fontSize: 20 }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <p
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#991b1b",
+                marginBottom: 2,
+              }}
+            >
+              Loja inativa
+            </p>
+            <p style={{ fontSize: 11, color: "#7f1d1d", lineHeight: 1.5 }}>
+              Há uma fatura em aberto. Pague para reativar sua loja.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/store/billing")}
+            style={{
+              padding: "7px 12px",
+              borderRadius: 8,
+              background: "#dc2626",
+              color: "#fff",
+              border: "none",
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: "pointer",
+              flexShrink: 0,
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            Ver fatura
+          </button>
+        </div>
+      )}
+
       <div
         style={{
           display: "grid",
@@ -439,7 +497,7 @@ export default function StoreDashboard() {
         ))}
       </div>
 
-      <BottomNav active="orders" />
+      <BottomNav active="orders" storeActive={store.active} />
       {toast && <Toast message={toast} type={toastType} />}
     </div>
   );
@@ -746,14 +804,28 @@ function OrderCard({
 // ── Bottom Navigation ─────────────────────────────────────
 export function BottomNav({
   active,
+  storeActive = true,
 }: {
   active: "orders" | "products" | "route" | "profile";
+  storeActive?: boolean;
 }) {
   const navigate = useNavigate();
   const items = [
     { key: "orders", icon: "🏠", label: "Pedidos", path: "/store" },
-    { key: "products", icon: "📦", label: "Produtos", path: "/store/products" },
-    { key: "route", icon: "🗺️", label: "Rota", path: "/store/route" },
+    {
+      key: "products",
+      icon: "📦",
+      label: "Produtos",
+      path: "/store/products",
+      blocked: !storeActive,
+    },
+    {
+      key: "route",
+      icon: "🗺️",
+      label: "Rota",
+      path: "/store/route",
+      blocked: !storeActive,
+    },
     { key: "profile", icon: "👤", label: "Perfil", path: "/store/profile" },
   ];
   return (
@@ -775,7 +847,7 @@ export function BottomNav({
       {items.map((item) => (
         <button
           key={item.key}
-          onClick={() => navigate(item.path)}
+          onClick={() => !(item as any).blocked && navigate(item.path)}
           style={{
             flex: 1,
             display: "flex",
@@ -784,7 +856,8 @@ export function BottomNav({
             gap: 3,
             background: "none",
             border: "none",
-            cursor: "pointer",
+            cursor: (item as any).blocked ? "not-allowed" : "pointer",
+            opacity: (item as any).blocked ? 0.35 : 1,
           }}
         >
           <span style={{ fontSize: 20 }}>{item.icon}</span>

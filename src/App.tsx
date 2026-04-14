@@ -14,6 +14,7 @@ import SplashScreen from "./screens/SplashScreen";
 import LoginScreen from "./screens/LoginScreen";
 import CadastroScreen from "./screens/CadastroScreen";
 import RecoverPasswordScreen from "./screens/RecoverPasswordScreen";
+import NewPasswordScreen from "./screens/NewPasswordScreen";
 
 // Comércio
 import StoreDashboard from "./screens/store/StoreDashboard";
@@ -24,6 +25,7 @@ import StoreSetupScreen from "./screens/store/StoreSetupScreen";
 import StoreMpConfigScreen from "./screens/store/StoreMpConfigScreen";
 import StoreMotoboyScreen from "./screens/store/StoreMotoboyScreen";
 import StoreScheduleScreen from "./screens/store/StoreScheduleScreen";
+import StoreChangeEmailScreen from "./screens/store/StoreChangeEmailScreen";
 import StoreBillingScreen from "./screens/store/StoreBillingScreen";
 import RouteBuilderScreen from "./screens/store/RouteBuilderScreen";
 import RouteConfirmScreen from "./screens/store/RouteConfirmScreen";
@@ -46,7 +48,7 @@ import {
 import MotoboyHomeScreen from "./screens/motoboy/MotoboyHomeScreen";
 import MotoboyRouteScreen from "./screens/motoboy/MotoboyRouteScreen";
 import MotoboyDeliveryScreen from "./screens/motoboy/MotoboyDeliveryScreen";
-const AdminScreen = () => <Placeholder label="⚙️  Painel Admin" />;
+import AdminScreen from "./screens/admin/AdminScreen";
 
 function Placeholder({ label }: { label: string }) {
   const { signOut } = useAuth();
@@ -204,6 +206,7 @@ export default function App() {
                 </PublicRoute>
               }
             />
+            <Route path="/nova-senha" element={<NewPasswordScreen />} />
 
             {/* ── Cliente ── prefixo /c/ para evitar conflito com /store do comércio */}
             <Route
@@ -329,6 +332,14 @@ export default function App() {
               }
             />
             <Route
+              path="/store/change-email"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <StoreChangeEmailScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
               path="/store/billing"
               element={
                 <PrivateRoute allowedRoles={["store"]}>
@@ -396,6 +407,14 @@ export default function App() {
             />
 
             {/* ── Admin ── */}
+            <Route
+              path="/admin"
+              element={
+                <PrivateRoute allowedRoles={["admin"]}>
+                  <AdminScreen />
+                </PrivateRoute>
+              }
+            />
             <Route
               path="/admin/*"
               element={

@@ -105,7 +105,9 @@ export default function StoreProfileScreen() {
           justifyContent: "center",
         }}
       >
-        <Spinner color={colors.rosa} />
+        <div style={{ maxWidth: 520, margin: "0 auto" }}>
+          <Spinner color={colors.rosa} />
+        </div>
       </div>
     );
 
@@ -330,6 +332,11 @@ export default function StoreProfileScreen() {
                 path: "/store/billing",
               },
               { icon: "🏍️", label: "Meus motoboys", path: "/store/motoboys" },
+              {
+                icon: "📧",
+                label: "Alterar e-mail",
+                path: "/store/change-email",
+              },
               {
                 icon: "🔔",
                 label: "Notificações",

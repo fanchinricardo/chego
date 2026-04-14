@@ -1,123 +1,217 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useStore } from "../../hooks/useStore";
-import { colors, Spinner } from "../../components/ui";
+import { colors, Spinner, Toast } from "../../components/ui";
 
-interface DaySales {
-  date: string;
-  total: number;
-  count: number;
+interface Invoice {
+  id: string;
+  type: "signup" | "monthly";
+  reference: string | null;
+  amount: number;
+  due_date: string;
+  paid_at: string | null;
+  status: "pending" | "paid" | "overdue";
+  qr_code: string | null;
+  qr_code_base64: string | null;
+  payment_id: string | null;
 }
 
-interface MonthlySales {
-  month: string;
-  total: number;
-  count: number;
-}
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export default function StoreBillingScreen() {
   const navigate = useNavigate();
   const { store } = useStore();
-  const [tab, setTab] = useState<"day" | "month">("day");
+
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dailySales, setDailySales] = useState<DaySales[]>([]);
-  const [monthlySales, setMonthlySales] = useState<MonthlySales[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const [generating, setGenerating] = useState<string | null>(null);
+  const [toast, setToast] = useState("");
+  const [toastType, setToastType] = useState<"success" | "error">("success");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [nextInvoice, setNextInvoice] = useState<{
+    amount: number;
+    pct: number;
+    salesTotal: number;
+    dueDay: number;
+  } | null>(null);
+  const pollingRef = useRef<any>(null);
+
+  function showToast(msg: string, type: "success" | "error" = "success") {
+    setToast(msg);
+    setToastType(type);
+    setTimeout(() => setToast(""), 3000);
+  }
 
   useEffect(() => {
     if (!store) return;
-    fetchSales(selectedMonth);
-  }, [store, selectedMonth]);
+    fetchInvoices();
+    fetchNextInvoice();
+    return () => clearInterval(pollingRef.current);
+  }, [store]);
 
-  async function fetchSales(month: string) {
+  // Polling automático para faturas pendentes com QR Code gerado
+  useEffect(() => {
+    const pending = invoices.filter(
+      (i) =>
+        (i.status === "pending" || i.status === "overdue") && i.qr_code_base64,
+    );
+    if (pending.length === 0) return;
+
+    clearInterval(pollingRef.current);
+    pollingRef.current = setInterval(async () => {
+      for (const inv of pending) {
+        await checkPayment(inv.id);
+      }
+    }, 5000);
+
+    return () => clearInterval(pollingRef.current);
+  }, [invoices]);
+
+  async function fetchNextInvoice() {
+    if (!store) return;
+    // Busca config do admin
+    const { data: config } = await supabase
+      .from("admin_config")
+      .select("monthly_pct, due_day")
+      .single();
+    if (!config) return;
+
+    // Calcula vendas do mês atual
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const { data: orders } = await supabase
+      .from("orders")
+      .select("total")
+      .eq("store_id", store.id)
+      .not("status", "in", '("cancelled","pending")')
+      .gte("created_at", monthStart);
+
+    const salesTotal = (orders ?? []).reduce((s, o) => s + Number(o.total), 0);
+    const amount = Math.max((salesTotal * config.monthly_pct) / 100, 9.9);
+
+    setNextInvoice({
+      amount,
+      pct: config.monthly_pct,
+      salesTotal,
+      dueDay: config.due_day,
+    });
+  }
+
+  async function fetchInvoices() {
     if (!store) return;
     setLoading(true);
-
-    // Calcula o fim do mês
-    const [y, m] = month.split("-").map(Number);
-    const nextMonth =
-      m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
-
-    // Vendas por dia do mês selecionado
-    const { data: daily } = await supabase
-      .from("orders")
-      .select("total, created_at")
+    const { data } = await supabase
+      .from("store_invoices")
+      .select("*")
       .eq("store_id", store.id)
-      .in("status", [
-        "delivered",
-        "confirmed",
-        "preparing",
-        "ready",
-        "in_delivery",
-      ])
-      .gte("created_at", `${month}-01`)
-      .lt("created_at", nextMonth)
-      .order("created_at");
-
-    // Agrupa por dia
-    const dayMap = new Map<string, { total: number; count: number }>();
-    for (const o of daily ?? []) {
-      const day = o.created_at.slice(0, 10);
-      const cur = dayMap.get(day) ?? { total: 0, count: 0 };
-      dayMap.set(day, {
-        total: cur.total + Number(o.total),
-        count: cur.count + 1,
-      });
-    }
-    const days = Array.from(dayMap.entries()).map(([date, v]) => ({
-      date,
-      ...v,
-    }));
-    setDailySales(days);
-
-    // Vendas por mês (últimos 12 meses)
-    const { data: monthly } = await supabase
-      .from("orders")
-      .select("total, created_at")
-      .eq("store_id", store.id)
-      .in("status", [
-        "delivered",
-        "confirmed",
-        "preparing",
-        "ready",
-        "in_delivery",
-      ])
-      .gte(
-        "created_at",
-        new Date(
-          new Date().setFullYear(new Date().getFullYear() - 2),
-        ).toISOString(),
-      )
-      .order("created_at");
-
-    const monthMap = new Map<string, { total: number; count: number }>();
-    for (const o of monthly ?? []) {
-      const month = o.created_at.slice(0, 7);
-      const cur = monthMap.get(month) ?? { total: 0, count: 0 };
-      monthMap.set(month, {
-        total: cur.total + Number(o.total),
-        count: cur.count + 1,
-      });
-    }
-    const months = Array.from(monthMap.entries())
-      .map(([month, v]) => ({ month, ...v }))
-      .sort((a, b) => a.month.localeCompare(b.month));
-    setMonthlySales(months);
-
+      .order("created_at", { ascending: false });
+    setInvoices((data ?? []) as Invoice[]);
     setLoading(false);
   }
 
-  const totalDay = dailySales.reduce((s, d) => s + d.total, 0);
-  const totalMonth =
-    monthlySales.find((m) => m.month === selectedMonth)?.total ?? 0;
-  const countMonth =
-    monthlySales.find((m) => m.month === selectedMonth)?.count ?? 0;
-  const maxDay = Math.max(...dailySales.map((d) => d.total), 1);
-  const maxMonth = Math.max(...monthlySales.map((m) => m.total), 1);
+  async function callBilling(body: Record<string, string>) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/check-invoice-payment`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? SUPABASE_KEY}`,
+          apikey: SUPABASE_KEY,
+        },
+        body: JSON.stringify(body),
+      },
+    );
+    return res.json();
+  }
+
+  async function handleVerifyPayment(invoice: Invoice) {
+    if (!invoice.payment_id) {
+      showToast("Gere o QR Code primeiro", "error");
+      return;
+    }
+    try {
+      const data = await callBilling({
+        action: "check_payment",
+        invoice_id: invoice.id,
+        store_id: store?.id ?? "",
+      });
+      if (data.paid) {
+        showToast("✅ Pagamento confirmado!");
+        fetchInvoices();
+      } else {
+        showToast("Pagamento ainda não identificado", "error");
+      }
+    } catch (err: any) {
+      showToast(err.message, "error");
+    }
+  }
+
+  async function handleGenerateQR(invoice: Invoice) {
+    setGenerating(invoice.id);
+    try {
+      const data = await callBilling({
+        action: "generate_qr",
+        invoice_id: invoice.id,
+        store_id: store?.id ?? "",
+      });
+      if (data.error) throw new Error(data.error);
+      showToast("QR Code gerado!");
+      fetchInvoices();
+      startPolling(invoice.id);
+    } catch (err: any) {
+      showToast(err.message, "error");
+    } finally {
+      setGenerating(null);
+    }
+  }
+
+  function startPolling(invoiceId: string) {
+    clearInterval(pollingRef.current);
+    pollingRef.current = setInterval(async () => {
+      await checkPayment(invoiceId);
+    }, 5000);
+  }
+
+  async function checkPayment(invoiceId: string) {
+    try {
+      // Verifica status direto no MP via Edge Function
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${SUPABASE_URL}/functions/v1/check-invoice-payment`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token ?? SUPABASE_KEY}`,
+            apikey: SUPABASE_KEY,
+          },
+          body: JSON.stringify({ invoice_id: invoiceId }),
+        },
+      );
+      const data = await res.json();
+      if (data?.status === "paid") {
+        clearInterval(pollingRef.current);
+        showToast("✅ Pagamento confirmado! Loja ativada!");
+        fetchInvoices();
+      }
+    } catch (err) {
+      console.warn("Erro ao verificar pagamento:", err);
+    }
+  }
+
+  function copyPix(code: string, id: string) {
+    navigator.clipboard.writeText(code);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
 
   const MONTH_NAMES = [
     "Jan",
@@ -133,23 +227,17 @@ export default function StoreBillingScreen() {
     "Nov",
     "Dez",
   ];
-
-  function formatMonth(m: string) {
-    const [y, mo] = m.split("-");
-    return `${MONTH_NAMES[Number(mo) - 1]}/${y.slice(2)}`;
+  function formatRef(ref: string | null) {
+    if (!ref) return "";
+    const [y, m] = ref.split("-");
+    return `${MONTH_NAMES[Number(m) - 1]}/${y}`;
   }
 
-  function formatDate(d: string) {
-    const [, , day] = d.split("-");
-    return `${day}`;
-  }
-
-  // Gera lista de meses para o seletor (últimos 12)
-  const monthOptions = Array.from({ length: 24 }, (_, i) => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const pending = invoices.filter(
+    (i) => i.status === "pending" || i.status === "overdue",
+  );
+  const paid = invoices.filter((i) => i.status === "paid");
+  const totalPaid = paid.reduce((s, i) => s + Number(i.amount), 0);
 
   return (
     <div
@@ -185,13 +273,12 @@ export default function StoreBillingScreen() {
             marginBottom: 2,
           }}
         >
-          Vendas
+          Faturas
         </p>
         <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
           {store?.name}
         </p>
 
-        {/* Cards resumo */}
         <div
           style={{
             display: "grid",
@@ -216,26 +303,19 @@ export default function StoreBillingScreen() {
                 marginBottom: 4,
               }}
             >
-              Este mês
+              Em aberto
             </p>
             <p
               style={{
                 fontFamily: "'Righteous', cursive",
                 fontSize: 22,
-                color: colors.rosa,
+                color: pending.length > 0 ? "#f59e0b" : "#22c55e",
                 lineHeight: 1,
               }}
             >
-              R$ {totalMonth.toFixed(2)}
-            </p>
-            <p
-              style={{
-                fontSize: 10,
-                color: "rgba(255,255,255,0.3)",
-                marginTop: 4,
-              }}
-            >
-              {countMonth} pedidos
+              {pending.length > 0
+                ? `${pending.length} fatura${pending.length > 1 ? "s" : ""}`
+                : "✓ Em dia"}
             </p>
           </div>
           <div
@@ -254,7 +334,7 @@ export default function StoreBillingScreen() {
                 marginBottom: 4,
               }}
             >
-              Hoje
+              Total pago
             </p>
             <p
               style={{
@@ -264,24 +344,7 @@ export default function StoreBillingScreen() {
                 lineHeight: 1,
               }}
             >
-              R${" "}
-              {(
-                dailySales.find(
-                  (d) => d.date === new Date().toISOString().slice(0, 10),
-                )?.total ?? 0
-              ).toFixed(2)}
-            </p>
-            <p
-              style={{
-                fontSize: 10,
-                color: "rgba(255,255,255,0.3)",
-                marginTop: 4,
-              }}
-            >
-              {dailySales.find(
-                (d) => d.date === new Date().toISOString().slice(0, 10),
-              )?.count ?? 0}{" "}
-              pedidos
+              R$ {totalPaid.toFixed(2)}
             </p>
           </div>
         </div>
@@ -292,317 +355,51 @@ export default function StoreBillingScreen() {
           padding: "16px",
           display: "flex",
           flexDirection: "column",
-          gap: 16,
+          gap: 12,
         }}
       >
-        {/* Seletor de mês */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <p
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#888",
-              flexShrink: 0,
-            }}
-          >
-            Mês:
-          </p>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            style={{
-              flex: 1,
-              padding: "8px 12px",
-              borderRadius: 10,
-              border: `1.5px solid ${colors.bordaLilas}`,
-              background: "#fff",
-              fontSize: 13,
-              color: colors.noite,
-              fontFamily: "'Space Grotesk', sans-serif",
-              outline: "none",
-            }}
-          >
-            {monthOptions.map((m) => (
-              <option key={m} value={m}>
-                {formatMonth(m)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Tabs */}
-        <div
-          style={{
-            display: "flex",
-            background: "#fff",
-            borderRadius: 12,
-            border: `1px solid ${colors.bordaLilas}`,
-            padding: 4,
-            gap: 4,
-          }}
-        >
-          {[
-            { key: "day", label: "📅 Por dia" },
-            { key: "month", label: "📊 Por mês" },
-          ].map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key as "day" | "month")}
-              style={{
-                flex: 1,
-                padding: "8px",
-                borderRadius: 9,
-                border: "none",
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 700,
-                fontFamily: "'Space Grotesk', sans-serif",
-                background: tab === t.key ? colors.noite : "transparent",
-                color: tab === t.key ? "#fff" : "#aaa",
-                transition: "all 0.15s",
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
         {loading ? (
           <div
             style={{ display: "flex", justifyContent: "center", padding: 40 }}
           >
             <Spinner color={colors.rosa} />
           </div>
+        ) : invoices.length === 0 ? (
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 14,
+              border: `1px solid ${colors.bordaLilas}`,
+              padding: "32px 20px",
+              textAlign: "center",
+            }}
+          >
+            <p style={{ fontSize: 32, marginBottom: 8 }}>🧾</p>
+            <p style={{ fontSize: 14, color: "#aaa" }}>
+              Nenhuma fatura encontrada
+            </p>
+          </div>
         ) : (
-          <>
-            {/* Gráfico de barras */}
+          invoices.map((inv) => (
             <div
+              key={inv.id}
               style={{
                 background: "#fff",
                 borderRadius: 14,
-                border: `1px solid ${colors.bordaLilas}`,
-                padding: "16px 14px",
-              }}
-            >
-              <p
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#aaa",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  marginBottom: 16,
-                }}
-              >
-                {tab === "day"
-                  ? `Vendas por dia — ${formatMonth(selectedMonth)}`
-                  : "Vendas por mês"}
-              </p>
-
-              {(tab === "day" ? dailySales : monthlySales).length === 0 ? (
-                <div style={{ textAlign: "center", padding: "24px 0" }}>
-                  <p style={{ fontSize: 24, marginBottom: 8 }}>📊</p>
-                  <p style={{ fontSize: 13, color: "#aaa" }}>
-                    Nenhuma venda neste período
-                  </p>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-end",
-                    gap: 4,
-                    height: 140,
-                    overflowX: "auto",
-                    paddingBottom: 4,
-                  }}
-                >
-                  {(tab === "day" ? dailySales : monthlySales).map(
-                    (item, i) => {
-                      const val = item.total;
-                      const max = tab === "day" ? maxDay : maxMonth;
-                      const pct = Math.max((val / max) * 100, 4);
-                      const label =
-                        tab === "day"
-                          ? formatDate((item as DaySales).date)
-                          : formatMonth((item as MonthlySales).month);
-                      const isToday =
-                        tab === "day" &&
-                        (item as DaySales).date ===
-                          new Date().toISOString().slice(0, 10);
-                      const isCurMonth =
-                        tab === "month" &&
-                        (item as MonthlySales).month === selectedMonth;
-                      const highlight = isToday || isCurMonth;
-                      return (
-                        <div
-                          key={i}
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            gap: 4,
-                            minWidth: tab === "day" ? 28 : 36,
-                            flex: 1,
-                          }}
-                        >
-                          <p
-                            style={{
-                              fontSize: 8,
-                              color: highlight ? colors.rosa : "#aaa",
-                              fontWeight: highlight ? 700 : 400,
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            R$
-                            {val >= 1000
-                              ? `${(val / 1000).toFixed(1)}k`
-                              : val.toFixed(0)}
-                          </p>
-                          <div
-                            style={{
-                              width: "100%",
-                              height: `${pct}%`,
-                              borderRadius: "4px 4px 0 0",
-                              background: highlight
-                                ? colors.rosa
-                                : colors.lilasClaro,
-                              transition: "height 0.3s",
-                              minHeight: 4,
-                            }}
-                          />
-                          <p
-                            style={{
-                              fontSize: 8,
-                              color: highlight ? colors.rosa : "#aaa",
-                              fontWeight: highlight ? 700 : 400,
-                            }}
-                          >
-                            {label}
-                          </p>
-                        </div>
-                      );
-                    },
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Tabela detalhada */}
-            <div
-              style={{
-                background: "#fff",
-                borderRadius: 14,
-                border: `1px solid ${colors.bordaLilas}`,
+                border: `1.5px solid ${inv.status === "overdue" ? "#fca5a5" : inv.status === "paid" ? "#86efac" : colors.bordaLilas}`,
                 overflow: "hidden",
               }}
             >
+              {/* Header da fatura */}
               <div
                 style={{
                   padding: "12px 16px",
-                  borderBottom: `1px solid ${colors.bordaLilas}`,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
                 }}
               >
-                <p
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#aaa",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                  }}
-                >
-                  {tab === "day"
-                    ? "Detalhamento por dia"
-                    : "Detalhamento por mês"}
-                </p>
-              </div>
-
-              {(tab === "day" ? dailySales : monthlySales).length === 0 ? (
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: "#aaa",
-                    textAlign: "center",
-                    padding: "24px 0",
-                  }}
-                >
-                  Nenhuma venda
-                </p>
-              ) : (
-                [...(tab === "day" ? dailySales : monthlySales)]
-                  .reverse()
-                  .map((item, i, arr) => {
-                    const label =
-                      tab === "day"
-                        ? new Date(
-                            (item as DaySales).date + "T12:00:00",
-                          ).toLocaleDateString("pt-BR", {
-                            weekday: "short",
-                            day: "2-digit",
-                            month: "2-digit",
-                          })
-                        : formatMonth((item as MonthlySales).month);
-                    const isLast = i === arr.length - 1;
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          padding: "10px 16px",
-                          borderBottom: isLast
-                            ? "none"
-                            : `1px solid ${colors.fundo}`,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <div>
-                          <p
-                            style={{
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: colors.noite,
-                            }}
-                          >
-                            {label}
-                          </p>
-                          <p
-                            style={{
-                              fontSize: 10,
-                              color: "#aaa",
-                              marginTop: 1,
-                            }}
-                          >
-                            {item.count} pedido{item.count !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                        <p
-                          style={{
-                            fontFamily: "'Righteous', cursive",
-                            fontSize: 16,
-                            color: colors.rosa,
-                          }}
-                        >
-                          R$ {item.total.toFixed(2)}
-                        </p>
-                      </div>
-                    );
-                  })
-              )}
-
-              {/* Total */}
-              {(tab === "day" ? dailySales : monthlySales).length > 0 && (
-                <div
-                  style={{
-                    padding: "12px 16px",
-                    background: colors.fundo,
-                    borderTop: `1px solid ${colors.bordaLilas}`,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
+                <div>
                   <p
                     style={{
                       fontSize: 13,
@@ -610,28 +407,225 @@ export default function StoreBillingScreen() {
                       color: colors.noite,
                     }}
                   >
-                    Total{" "}
-                    {tab === "day" ? formatMonth(selectedMonth) : "período"}
+                    {inv.type === "signup"
+                      ? "🏪 Taxa de adesão"
+                      : `📅 Mensalidade ${formatRef(inv.reference)}`}
                   </p>
+                  <p style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>
+                    Vencimento:{" "}
+                    {new Date(inv.due_date + "T12:00:00").toLocaleDateString(
+                      "pt-BR",
+                    )}
+                  </p>
+                </div>
+                <div style={{ textAlign: "right" }}>
                   <p
                     style={{
                       fontFamily: "'Righteous', cursive",
                       fontSize: 18,
-                      color: colors.rosa,
+                      color:
+                        inv.status === "paid"
+                          ? "#15803d"
+                          : inv.status === "overdue"
+                            ? "#dc2626"
+                            : colors.rosa,
                     }}
                   >
-                    R${" "}
-                    {(tab === "day"
-                      ? totalDay
-                      : monthlySales.reduce((s, m) => s + m.total, 0)
-                    ).toFixed(2)}
+                    R$ {Number(inv.amount).toFixed(2)}
+                  </p>
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 8,
+                      background:
+                        inv.status === "paid"
+                          ? "#f0fdf4"
+                          : inv.status === "overdue"
+                            ? "#fef2f2"
+                            : "#fff8e6",
+                      color:
+                        inv.status === "paid"
+                          ? "#15803d"
+                          : inv.status === "overdue"
+                            ? "#dc2626"
+                            : "#b45309",
+                      border: `1px solid ${inv.status === "paid" ? "#86efac" : inv.status === "overdue" ? "#fca5a5" : "#fcd34d"}`,
+                    }}
+                  >
+                    {inv.status === "paid"
+                      ? "✓ PAGO"
+                      : inv.status === "overdue"
+                        ? "⚠️ VENCIDO"
+                        : "PENDENTE"}
+                  </span>
+                </div>
+              </div>
+
+              {/* QR Code se gerado */}
+              {inv.status !== "paid" && inv.qr_code_base64 && (
+                <div
+                  style={{
+                    padding: "0 16px 12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  <img
+                    src={`data:image/png;base64,${inv.qr_code_base64}`}
+                    style={{
+                      width: 180,
+                      height: 180,
+                      borderRadius: 8,
+                      border: `2px solid ${colors.bordaLilas}`,
+                    }}
+                    alt="QR Code Pix"
+                  />
+                  <p
+                    style={{ fontSize: 11, color: "#888", textAlign: "center" }}
+                  >
+                    Escaneie o QR Code para pagar
+                  </p>
+                  {inv.qr_code && (
+                    <button
+                      onClick={() => copyPix(inv.qr_code!, inv.id)}
+                      style={{
+                        width: "100%",
+                        padding: "9px",
+                        borderRadius: 10,
+                        background:
+                          copiedId === inv.id ? "#f0fdf4" : colors.lilasClaro,
+                        border: "none",
+                        color: copiedId === inv.id ? "#15803d" : "#7e22ce",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      {copiedId === inv.id
+                        ? "✓ Copiado!"
+                        : "📋 Copiar código Pix"}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleGenerateQR(inv)}
+                    disabled={generating === inv.id}
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: 10,
+                      background: "transparent",
+                      border: `1px solid ${colors.bordaLilas}`,
+                      color: "#888",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    {generating === inv.id
+                      ? "⏳ Gerando..."
+                      : "🔄 Gerar novo QR Code"}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const data = await callBilling({
+                        action: "check_payment",
+                        invoice_id: inv.id,
+                        store_id: store?.id ?? "",
+                      });
+                      if (data.status === "paid") {
+                        showToast("✅ Pagamento confirmado! Loja ativada!");
+                        fetchInvoices();
+                      } else {
+                        showToast("Pagamento ainda não identificado", "error");
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: 10,
+                      background: "transparent",
+                      border: `1px solid #86efac`,
+                      color: "#15803d",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    🔍 Verificar pagamento
+                  </button>
+                  <div
+                    style={{
+                      background: "#fff8e6",
+                      border: "1px solid #fcd34d",
+                      borderRadius: 10,
+                      padding: "8px 12px",
+                      width: "100%",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 10,
+                        color: "#92400e",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      ⏳ Pagamento identificado automaticamente em até 5 minutos
+                      após o Pix.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Botão gerar QR */}
+              {inv.status !== "paid" && !inv.qr_code_base64 && (
+                <div style={{ padding: "0 16px 12px" }}>
+                  <button
+                    onClick={() => handleGenerateQR(inv)}
+                    disabled={generating === inv.id}
+                    style={{
+                      width: "100%",
+                      padding: "11px",
+                      borderRadius: 11,
+                      background:
+                        inv.status === "overdue" ? "#dc2626" : colors.rosa,
+                      color: "#fff",
+                      border: "none",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: generating === inv.id ? "not-allowed" : "pointer",
+                      opacity: generating === inv.id ? 0.7 : 1,
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    {generating === inv.id
+                      ? "⏳ Gerando..."
+                      : "⚡ Gerar QR Code para pagar"}
+                  </button>
+                </div>
+              )}
+
+              {/* Pago em */}
+              {inv.status === "paid" && inv.paid_at && (
+                <div style={{ padding: "0 16px 12px" }}>
+                  <p style={{ fontSize: 11, color: "#15803d" }}>
+                    ✓ Pago em{" "}
+                    {new Date(inv.paid_at).toLocaleDateString("pt-BR")}
                   </p>
                 </div>
               )}
             </div>
-          </>
+          ))
         )}
       </div>
+
+      {toast && <Toast message={toast} type={toastType} />}
     </div>
   );
 }

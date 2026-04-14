@@ -141,7 +141,15 @@ export function OtpInput({ length = 4, value, onChange }: OtpInputProps) {
   }
 
   return (
-    <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+    <div
+      style={{
+        display: "flex",
+        gap: 6,
+        justifyContent: "center",
+        flexWrap: "nowrap",
+        width: "100%",
+      }}
+    >
       {digits.map((d, i) => (
         <input
           key={i}
@@ -152,13 +160,15 @@ export function OtpInput({ length = 4, value, onChange }: OtpInputProps) {
           onKeyDown={(e) => handleKey(i, e)}
           inputMode="numeric"
           style={{
-            width: 52,
-            height: 58,
-            borderRadius: 12,
+            flex: 1,
+            minWidth: 0,
+            maxWidth: 48,
+            height: 52,
+            borderRadius: 10,
             border: `1.5px solid ${d ? colors.rosa : colors.bordaLilas}`,
             background: d ? colors.lilasInput : colors.fundo,
             textAlign: "center",
-            fontSize: 22,
+            fontSize: 18,
             fontWeight: 700,
             color: d ? colors.rosa : colors.noite,
             fontFamily: "'Space Grotesk', sans-serif",
@@ -270,7 +280,7 @@ export function Spinner({
 }
 
 // ── Divider ───────────────────────────────────────────────
-export function Divider({ label = "" }: { label?: string }) {
+export function Divider({ label = "ou continue com" }: { label?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <div style={{ flex: 1, height: 1, background: colors.bordaLilas }} />

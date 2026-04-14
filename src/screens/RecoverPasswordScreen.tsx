@@ -1,66 +1,90 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Logo, Input, Button, OtpInput, Toast, colors } from '../components/ui'
-import { useAuth } from '../contexts/AuthContext'
+import { useState } from "react";
+import { supabase } from "../lib/supabase";
+import { useNavigate } from "react-router-dom";
+import { Logo, Input, Button, OtpInput, Toast, colors } from "../components/ui";
+import { useAuth } from "../contexts/AuthContext";
 
-type Step = 'email' | 'otp' | 'success'
+type Step = "email" | "otp" | "success";
 
 export default function RecoverPasswordScreen() {
-  const navigate = useNavigate()
-  const { sendPasswordReset } = useAuth()
+  const navigate = useNavigate();
+  const { sendPasswordReset } = useAuth();
 
-  const [step, setStep]         = useState<Step>('email')
-  const [email, setEmail]       = useState('')
-  const [otp, setOtp]           = useState('')
-  const [countdown, setCountdown] = useState(0)
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
-  const [toast, setToast]       = useState('')
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [countdown, setCountdown] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
 
   function startCountdown() {
-    setCountdown(60)
+    setCountdown(60);
     const timer = setInterval(() => {
-      setCountdown(c => {
-        if (c <= 1) { clearInterval(timer); return 0 }
-        return c - 1
-      })
-    }, 1000)
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
   }
 
   async function handleSendEmail() {
-    if (!email) { setError('Informe seu e-mail'); return }
-    setLoading(true)
-    setError('')
+    if (!email) {
+      setError("Informe seu e-mail");
+      return;
+    }
+    setLoading(true);
+    setError("");
     try {
-      await sendPasswordReset(email)
-      setStep('otp')
-      startCountdown()
+      await sendPasswordReset(email);
+      setStep("otp");
+      startCountdown();
     } catch (e: any) {
-      setError(e.message)
+      setError(e.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function handleResend() {
-    if (countdown > 0) return
-    setLoading(true)
+    if (countdown > 0) return;
+    setLoading(true);
     try {
-      await sendPasswordReset(email)
-      startCountdown()
-      setToast('Código reenviado!')
-      setTimeout(() => setToast(''), 3000)
+      await sendPasswordReset(email);
+      startCountdown();
+      setToast("Código reenviado!");
+      setTimeout(() => setToast(""), 3000);
     } catch (e: any) {
-      setError(e.message)
+      setError(e.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  // Na produção: verificar OTP via supabase.auth.verifyOtp
-  function handleVerifyOtp() {
-    if (otp.length < 4) { setError('Digite os 4 dígitos do código'); return }
-    setStep('success')
+  async function handleVerifyOtp() {
+    if (otp.length < 8) {
+      setError("Digite os 8 dígitos do código");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const { error, data } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: "email",
+      });
+      if (error) throw new Error("Código inválido ou expirado");
+      // Login feito com sucesso — vai para tela de nova senha
+      navigate("/nova-senha", { replace: true });
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -81,7 +105,7 @@ export default function RecoverPasswordScreen() {
             background: "none",
             border: "none",
             cursor: "pointer",
-            color: "#fff",
+            color: "rgba(255,255,255,0.35)",
             fontSize: 13,
             fontFamily: "'Space Grotesk', sans-serif",
             marginBottom: 16,
@@ -167,11 +191,11 @@ export default function RecoverPasswordScreen() {
               }}
             >
               <p style={{ fontSize: 13, color: "#888", textAlign: "center" }}>
-                Digite o código de 4 dígitos enviado para{" "}
+                Digite o código de 8 dígitos enviado para{" "}
                 <strong style={{ color: colors.noite }}>{email}</strong>
               </p>
 
-              <OtpInput value={otp} onChange={setOtp} />
+              <OtpInput value={otp} onChange={setOtp} length={8} />
 
               <button
                 onClick={handleResend}
@@ -200,7 +224,7 @@ export default function RecoverPasswordScreen() {
               variant="primary"
               fullWidth
               onClick={handleVerifyOtp}
-              disabled={otp.length < 4}
+              disabled={otp.length < 8}
             >
               Verificar código
             </Button>
