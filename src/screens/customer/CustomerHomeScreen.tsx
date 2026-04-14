@@ -45,36 +45,48 @@ export default function CustomerHomeScreen() {
         minHeight: "100dvh",
         background: colors.fundo,
         fontFamily: "'Space Grotesk', sans-serif",
-        paddingBottom: 80,
+        paddingBottom: 90,
       }}
     >
-      {/* Header */}
+      {/* ── Header ── */}
       <div style={{ background: colors.noite }}>
         <div
-          style={{ maxWidth: 520, margin: "0 auto", padding: "16px 20px 14px" }}
+          style={{ maxWidth: 520, margin: "0 auto", padding: "16px 18px 14px" }}
         >
+          {/* Top row */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              marginBottom: 6,
+              marginBottom: 10,
             }}
           >
-            <Logo size={24} />
-            <div style={{ display: "flex", gap: 8 }}>
+            <div>
+              <Logo size={22} />
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.4)",
+                  marginTop: 2,
+                }}
+              >
+                Olá, {profile?.full_name?.split(" ")[0]} 👋
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {itemCount > 0 && (
                 <button
                   onClick={() => navigate("/cart")}
                   style={{
                     position: "relative",
-                    width: 34,
-                    height: 34,
+                    width: 36,
+                    height: 36,
                     borderRadius: "50%",
                     background: "rgba(233,30,140,0.15)",
                     border: "none",
                     cursor: "pointer",
-                    fontSize: 16,
+                    fontSize: 17,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -86,8 +98,8 @@ export default function CustomerHomeScreen() {
                       position: "absolute",
                       top: -2,
                       right: -2,
-                      width: 16,
-                      height: 16,
+                      width: 17,
+                      height: 17,
                       borderRadius: "50%",
                       background: colors.rosa,
                       color: "#fff",
@@ -105,13 +117,13 @@ export default function CustomerHomeScreen() {
               <button
                 onClick={() => navigate("/profile")}
                 style={{
-                  width: 34,
-                  height: 34,
+                  width: 36,
+                  height: 36,
                   borderRadius: "50%",
                   background: "rgba(233,30,140,0.12)",
                   border: "none",
                   cursor: "pointer",
-                  fontSize: 16,
+                  fontSize: 17,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -121,100 +133,99 @@ export default function CustomerHomeScreen() {
               </button>
             </div>
           </div>
-          <p
+
+          {/* Barra de busca */}
+          <div
             style={{
-              fontSize: 10,
-              color: "rgba(255,255,255,0.35)",
-              marginBottom: 10,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: "rgba(255,255,255,0.09)",
+              borderRadius: 12,
+              padding: "10px 14px",
             }}
           >
-            Olá, {profile?.full_name?.split(" ")[0]} 👋
-          </p>
-          <div style={{ display: "flex", gap: 8 }}>
-            <div
+            <span style={{ fontSize: 15, flexShrink: 0 }}>🔍</span>
+            <input
+              value={search}
+              onChange={handleSearch}
+              placeholder="Buscar comércio ou produto..."
               style={{
                 flex: 1,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                background: "rgba(255,255,255,0.08)",
-                borderRadius: 10,
-                padding: "9px 12px",
+                background: "none",
+                border: "none",
+                outline: "none",
+                color: "#fff",
+                fontSize: 13,
+                fontFamily: "'Space Grotesk', sans-serif",
               }}
-            >
-              <span style={{ fontSize: 14, flexShrink: 0 }}>🔍</span>
-              <input
-                value={search}
-                onChange={handleSearch}
-                placeholder="Buscar comércio ou produto..."
+            />
+            {search && (
+              <button
+                onClick={clearSearch}
                 style={{
-                  flex: 1,
                   background: "none",
                   border: "none",
-                  outline: "none",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontFamily: "'Space Grotesk', sans-serif",
+                  color: "rgba(255,255,255,0.4)",
+                  cursor: "pointer",
+                  fontSize: 15,
+                  padding: 0,
                 }}
-              />
-              {search && (
-                <button
-                  onClick={clearSearch}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255,255,255,0.3)",
-                    cursor: "pointer",
-                    fontSize: 14,
-                  }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Categorias */}
+      {/* ── Categorias ── */}
       <div
         style={{
-          maxWidth: 520,
-          margin: "0 auto",
-          display: "flex",
-          gap: 8,
-          padding: "12px 16px",
-          overflowX: "auto",
+          background: colors.noite,
+          borderBottom: `1px solid rgba(255,255,255,0.06)`,
         }}
       >
-        <CategoryPill
-          icon="🏪"
-          label="Todos"
-          selected={!selectedGroup}
-          onClick={() => setSelectedGroup(undefined)}
-        />
-        {groups.map((g) => (
-          <CategoryPill
-            key={g.id}
-            icon={g.icon ?? "🏪"}
-            label={g.name}
-            selected={selectedGroup === g.id}
-            onClick={() =>
-              setSelectedGroup((prev) => (prev === g.id ? undefined : g.id))
-            }
-          />
-        ))}
+        <div style={{ maxWidth: 520, margin: "0 auto" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              padding: "10px 18px 14px",
+              overflowX: "auto",
+              scrollbarWidth: "none",
+            }}
+          >
+            <CategoryPill
+              icon="🏪"
+              label="Todos"
+              selected={!selectedGroup}
+              onClick={() => setSelectedGroup(undefined)}
+            />
+            {groups.map((g) => (
+              <CategoryPill
+                key={g.id}
+                icon={g.icon ?? "🏪"}
+                label={g.name}
+                selected={selectedGroup === g.id}
+                onClick={() =>
+                  setSelectedGroup((prev) => (prev === g.id ? undefined : g.id))
+                }
+              />
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Conteúdo */}
-      <div style={{ maxWidth: 520, margin: "0 auto" }}>
+      {/* ── Conteúdo ── */}
+      <div style={{ maxWidth: 520, margin: "0 auto", width: "100%" }}>
         {loading ? (
-          <div style={{ padding: 40, textAlign: "center" }}>
+          <div style={{ padding: 48, textAlign: "center" }}>
             <Spinner color={colors.rosa} />
           </div>
         ) : stores.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "48px 24px" }}>
-            <p style={{ fontSize: 32, marginBottom: 12 }}>🏪</p>
+          <div style={{ textAlign: "center", padding: "56px 24px" }}>
+            <p style={{ fontSize: 40, marginBottom: 12 }}>🏪</p>
             <p style={{ fontSize: 15, fontWeight: 700, color: colors.noite }}>
               Nenhum comércio encontrado
             </p>
@@ -223,9 +234,16 @@ export default function CustomerHomeScreen() {
             </p>
           </div>
         ) : (
-          <div style={{ padding: "0 16px" }}>
+          <div
+            style={{
+              padding: "16px 18px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 20,
+            }}
+          >
             {openStores.length > 0 && (
-              <>
+              <div>
                 <p
                   style={{
                     fontSize: 11,
@@ -234,18 +252,12 @@ export default function CustomerHomeScreen() {
                     textTransform: "uppercase",
                     letterSpacing: "0.08em",
                     marginBottom: 10,
-                    marginTop: 4,
                   }}
                 >
                   Abertos agora ({openStores.length})
                 </p>
                 <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                    marginBottom: 20,
-                  }}
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
                 >
                   {openStores.map((s) => (
                     <StoreCard
@@ -255,10 +267,11 @@ export default function CustomerHomeScreen() {
                     />
                   ))}
                 </div>
-              </>
+              </div>
             )}
+
             {closedStores.length > 0 && (
-              <>
+              <div>
                 <p
                   style={{
                     fontSize: 11,
@@ -272,7 +285,7 @@ export default function CustomerHomeScreen() {
                   Fechados
                 </p>
                 <div
-                  style={{ display: "flex", flexDirection: "column", gap: 10 }}
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
                 >
                   {closedStores.map((s) => (
                     <StoreCard
@@ -283,48 +296,49 @@ export default function CustomerHomeScreen() {
                     />
                   ))}
                 </div>
-              </>
+              </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Barra do carrinho flutuante */}
+      {/* ── Barra do carrinho flutuante ── */}
       {itemCount > 0 && (
         <div
           onClick={() => navigate("/cart")}
           style={{
             position: "fixed",
-            bottom: 76,
+            bottom: 80,
             left: "50%",
             transform: "translateX(-50%)",
             width: "calc(100% - 32px)",
-            maxWidth: 448,
+            maxWidth: 452,
             background: colors.noite,
-            borderRadius: 13,
-            padding: "12px 16px",
+            borderRadius: 14,
+            padding: "13px 18px",
             cursor: "pointer",
             zIndex: 50,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             border: `1px solid ${colors.roxoMedio}`,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span
               style={{
                 background: colors.rosa,
                 color: "#fff",
                 fontSize: 11,
                 fontWeight: 700,
-                padding: "2px 8px",
+                padding: "3px 10px",
                 borderRadius: 20,
               }}
             >
               {itemCount}
             </span>
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
               itens no carrinho
             </span>
           </div>
@@ -345,6 +359,7 @@ export default function CustomerHomeScreen() {
   );
 }
 
+// ── Pill de categoria ─────────────────────────────────────
 function CategoryPill({
   icon,
   label,
@@ -370,14 +385,14 @@ function CategoryPill({
     >
       <div
         style={{
-          width: 44,
-          height: 44,
-          borderRadius: 12,
-          background: selected ? colors.rosa : colors.lilasClaro,
+          width: 48,
+          height: 48,
+          borderRadius: 14,
+          background: selected ? colors.rosa : "rgba(255,255,255,0.1)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 20,
+          fontSize: 22,
           transition: "all 0.15s",
         }}
       >
@@ -387,7 +402,7 @@ function CategoryPill({
         style={{
           fontSize: 10,
           fontWeight: 600,
-          color: selected ? colors.rosa : "#aaa",
+          color: selected ? colors.rosa : "rgba(255,255,255,0.55)",
           whiteSpace: "nowrap",
         }}
       >
@@ -397,6 +412,7 @@ function CategoryPill({
   );
 }
 
+// ── Card de comércio ──────────────────────────────────────
 function StoreCard({
   store,
   onPress,
@@ -411,16 +427,18 @@ function StoreCard({
       onClick={closed ? undefined : onPress}
       style={{
         background: "#fff",
-        borderRadius: 14,
+        borderRadius: 16,
         border: `1px solid ${colors.bordaLilas}`,
         overflow: "hidden",
         cursor: closed ? "default" : "pointer",
-        opacity: closed ? 0.6 : 1,
+        opacity: closed ? 0.55 : 1,
+        boxShadow: closed ? "none" : "0 2px 12px rgba(28,10,46,0.07)",
       }}
     >
+      {/* Banner */}
       <div
         style={{
-          height: 72,
+          height: 80,
           background: colors.noite,
           position: "relative",
           display: "flex",
@@ -432,13 +450,13 @@ function StoreCard({
           <img
             src={store.logo_url}
             alt={store.name}
-            style={{ height: 48, objectFit: "contain" }}
+            style={{ height: 52, objectFit: "contain" }}
           />
         ) : (
           <span
             style={{
               fontFamily: "'Righteous', cursive",
-              fontSize: 18,
+              fontSize: 20,
               color: "#fff",
               letterSpacing: 1,
             }}
@@ -450,46 +468,82 @@ function StoreCard({
           <span
             style={{
               position: "absolute",
-              top: 8,
-              right: 10,
+              top: 10,
+              right: 12,
               background: "#22c55e",
               color: "#fff",
               fontSize: 9,
               fontWeight: 700,
-              padding: "2px 8px",
+              padding: "3px 9px",
               borderRadius: 8,
             }}
           >
             Aberto
           </span>
         )}
+        {closed && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(0,0,0,0.35)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#fff",
+                background: "rgba(0,0,0,0.5)",
+                padding: "4px 10px",
+                borderRadius: 8,
+              }}
+            >
+              Fechado
+            </span>
+          </div>
+        )}
       </div>
+
+      {/* Info */}
       <div
         style={{
-          padding: "8px 12px",
+          padding: "10px 14px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 8,
         }}
       >
-        <div>
-          <p style={{ fontSize: 13, fontWeight: 700, color: colors.noite }}>
+        <div style={{ minWidth: 0 }}>
+          <p
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: colors.noite,
+              marginBottom: 3,
+            }}
+          >
             {store.name}
           </p>
-          <p style={{ fontSize: 10, color: "#888", marginTop: 2 }}>
+          <p style={{ fontSize: 11, color: "#888" }}>
             {store.open_now
-              ? `⭐ 4.8 · ${store.estimated_time ?? 30} min · ${store.delivery_fee > 0 ? `R$\u00a0${store.delivery_fee.toFixed(0)}` : "Grátis"}`
+              ? `⭐ 4.8 · ${store.estimated_time ?? 30} min · ${store.delivery_fee > 0 ? `R$\u00a0${store.delivery_fee.toFixed(0)} entrega` : "Entrega grátis"}`
               : "Fechado no momento"}
           </p>
         </div>
         <span
           style={{
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 700,
             color: "#7e22ce",
             background: colors.lilasClaro,
-            padding: "3px 9px",
+            padding: "4px 10px",
             borderRadius: 10,
+            flexShrink: 0,
           }}
         >
           {store.store_groups?.icon} {store.store_groups?.name}

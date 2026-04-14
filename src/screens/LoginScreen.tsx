@@ -1,17 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Logo, Input, Button, Divider, Toast, colors } from "../components/ui";
+import { Logo, Input, Button, Toast, colors } from "../components/ui";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function LoginScreen() {
   const navigate = useNavigate();
-  const { signInWithEmail, signInWithGoogle } = useAuth();
+  const { signInWithEmail } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoad, setGoogleLoad] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
 
@@ -28,7 +27,6 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signInWithEmail(email, password);
-      // AuthContext redireciona automaticamente via useEffect no Splash
     } catch (e: any) {
       showError(
         e.message === "Invalid login credentials"
@@ -37,16 +35,6 @@ export default function LoginScreen() {
       );
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleGoogle() {
-    setGoogleLoad(true);
-    try {
-      await signInWithGoogle();
-    } catch (e: any) {
-      showError(e.message);
-      setGoogleLoad(false);
     }
   }
 
@@ -60,13 +48,10 @@ export default function LoginScreen() {
         fontFamily: "'Space Grotesk', sans-serif",
       }}
     >
-      <div style={{ maxWidth: 520, margin: "0 auto" }}>
-        {/* ── Header roxo ── */}
+      {/* Header */}
+      <div style={{ background: colors.noite }}>
         <div
-          style={{
-            background: colors.noite,
-            padding: "20px 24px 32px",
-          }}
+          style={{ maxWidth: 520, margin: "0 auto", padding: "20px 24px 36px" }}
         >
           <button
             onClick={() => navigate(-1)}
@@ -77,22 +62,19 @@ export default function LoginScreen() {
               color: "rgba(255,255,255,0.35)",
               fontSize: 13,
               fontFamily: "'Space Grotesk', sans-serif",
-              marginBottom: 16,
+              marginBottom: 20,
               padding: 0,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
             }}
           >
             ← Voltar
           </button>
-          <Logo size={32} />
+          <Logo size={34} />
           <p
             style={{
-              fontSize: 22,
+              fontSize: 26,
               fontWeight: 700,
               color: "#fff",
-              marginTop: 12,
+              marginTop: 14,
               lineHeight: 1.2,
             }}
           >
@@ -100,20 +82,32 @@ export default function LoginScreen() {
           </p>
           <p
             style={{
-              fontSize: 13,
-              color: "rgba(255,255,255,0.4)",
-              marginTop: 4,
+              fontSize: 14,
+              color: "rgba(255,255,255,0.45)",
+              marginTop: 6,
             }}
           >
             Entre na sua conta Chegô
           </p>
         </div>
+      </div>
 
-        {/* ── Formulário ── */}
+      {/* Formulário — card flutuando sobre o header */}
+      <div
+        style={{
+          maxWidth: 520,
+          margin: "0 auto",
+          width: "100%",
+          padding: "0 20px",
+          marginTop: -20,
+        }}
+      >
         <div
           style={{
-            flex: 1,
-            padding: "28px 24px 36px",
+            background: "#fff",
+            borderRadius: 20,
+            padding: "28px 24px 32px",
+            boxShadow: "0 4px 32px rgba(28,10,46,0.10)",
             display: "flex",
             flexDirection: "column",
             gap: 18,
@@ -130,7 +124,7 @@ export default function LoginScreen() {
             inputMode="email"
           />
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <Input
               label="Senha"
               type={showPass ? "text" : "password"}
@@ -198,62 +192,17 @@ export default function LoginScreen() {
             fullWidth
             loading={loading}
             onClick={handleLogin}
-            style={{ marginTop: 4 }}
+            style={{ fontSize: 15, marginTop: 2 }}
           >
             Entrar agora
           </Button>
 
-          <Divider />
-
-          {/* Google */}
-          <button
-            onClick={handleGoogle}
-            disabled={googleLoad}
-            style={{
-              width: "100%",
-              padding: "13px 20px",
-              borderRadius: 13,
-              background: "#fff",
-              border: `1.5px solid ${colors.bordaLilas}`,
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: 14,
-              fontWeight: 600,
-              color: colors.noite,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              opacity: googleLoad ? 0.6 : 1,
-            }}
-          >
-            <div
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                background: colors.rosa,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 11,
-                fontWeight: 800,
-                color: "#fff",
-                flexShrink: 0,
-              }}
-            >
-              G
-            </div>
-            {googleLoad ? "Aguarde..." : "Entrar com Google"}
-          </button>
-
-          {/* Link cadastro */}
           <p
             style={{
               textAlign: "center",
               fontSize: 13,
-              color: "#888",
-              marginTop: 4,
+              color: "#aaa",
+              margin: 0,
             }}
           >
             Não tem conta?{" "}
@@ -265,9 +214,9 @@ export default function LoginScreen() {
             </span>
           </p>
         </div>
-
-        {toast && <Toast message={toast} />}
       </div>
+
+      {toast && <Toast message={toast} />}
     </div>
   );
 }
