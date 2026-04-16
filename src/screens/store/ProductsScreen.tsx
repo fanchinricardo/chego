@@ -34,6 +34,7 @@ const EMPTY_FORM: ProductPayload & { imageFile?: File; imagePreview?: string } =
 
 export default function ProductsScreen() {
   const { store } = useStore();
+  const navigate = useNavigate();
   const {
     products,
     categories,
@@ -670,9 +671,11 @@ export default function ProductsScreen() {
                 </div>
                 {(form as any).size_type === "sizes" && editing && (
                   <button
-                    onClick={() =>
-                      navigate(`/store/product-sizes/${editing.id}`)
-                    }
+                    onClick={() => {
+                      const pid = editing?.id;
+                      setShowModal(false);
+                      if (pid) navigate(`/store/product-sizes/${pid}`);
+                    }}
                     style={{
                       marginTop: 8,
                       width: "100%",

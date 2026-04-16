@@ -85,7 +85,8 @@ export default function StoreBillingScreen() {
       .from("orders")
       .select("total")
       .eq("store_id", store.id)
-      .not("status", "in", '("cancelled","pending")')
+      .neq("status", "cancelled")
+      .neq("status", "pending")
       .gte("created_at", monthStart);
 
     const salesTotal = (orders ?? []).reduce((s, o) => s + Number(o.total), 0);

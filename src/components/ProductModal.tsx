@@ -59,7 +59,17 @@ export function ProductModal({
   const [halfSizes, setHalfSizes] = useState<ProductSizePrice[]>([]);
   const [halfSearch, setHalfSearch] = useState("");
 
+  // Debug — remover após confirmar
+  console.log("[ProductModal]", product.name, {
+    allows_half: product.allows_half,
+    size_type: product.size_type,
+    halfCandidatesCount: allProducts.filter(
+      (p) => p.allows_half === true && p.id !== product.id,
+    ).length,
+  });
+
   const hasSizes = product.size_type === "sizes";
+  const allowsHalf = product.allows_half === true; // defensivo contra null/undefined
 
   // Carrega tamanhos do produto principal
   useEffect(() => {
@@ -104,7 +114,10 @@ export function ProductModal({
 
   // Produtos compatíveis para meia pizza (mesma loja, allows_half, diferente do atual)
   const halfCandidates = allProducts
-    .filter((p) => p.id !== product.id && p.allows_half && p.active !== false)
+    .filter(
+      (p) =>
+        p.id !== product.id && p.allows_half === true && p.active !== false,
+    )
     .filter(
       (p) =>
         halfSearch.length < 2 ||
@@ -278,7 +291,7 @@ export function ProductModal({
           )}
 
           {/* ── Meia pizza ── */}
-          {product.allows_half && (
+          {allowsHalf && (
             <div
               style={{
                 background: "#fff",

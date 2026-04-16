@@ -42,75 +42,84 @@ export default function LoginScreen() {
     <div
       style={{
         minHeight: "100dvh",
-        background: colors.fundo,
+        background: colors.noite,
         display: "flex",
         flexDirection: "column",
         fontFamily: "'Space Grotesk', sans-serif",
       }}
     >
       {/* Header */}
-      <div style={{ background: colors.noite }}>
-        <div
-          style={{ maxWidth: 520, margin: "0 auto", padding: "20px 24px 36px" }}
-        >
-          <button
-            onClick={() => navigate(-1)}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "rgba(255,255,255,0.35)",
-              fontSize: 13,
-              fontFamily: "'Space Grotesk', sans-serif",
-              marginBottom: 20,
-              padding: 0,
-            }}
-          >
-            ← Voltar
-          </button>
-          <Logo size={34} />
-          <p
-            style={{
-              fontSize: 26,
-              fontWeight: 700,
-              color: "#fff",
-              marginTop: 14,
-              lineHeight: 1.2,
-            }}
-          >
-            Bem-vindo <span style={{ color: colors.rosa }}>de volta!</span>
-          </p>
-          <p
-            style={{
-              fontSize: 14,
-              color: "rgba(255,255,255,0.45)",
-              marginTop: 6,
-            }}
-          >
-            Entre na sua conta Chegô
-          </p>
-        </div>
-      </div>
-
-      {/* Formulário — card flutuando sobre o header */}
       <div
         style={{
           maxWidth: 520,
           margin: "0 auto",
           width: "100%",
-          padding: "0 20px",
-          marginTop: -20,
+          padding: "20px 24px 0",
+        }}
+      >
+        {/* Botão voltar visível */}
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            background: "rgba(255,255,255,0.12)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            borderRadius: 10,
+            padding: "8px 16px",
+            cursor: "pointer",
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 600,
+            fontFamily: "'Space Grotesk', sans-serif",
+            marginBottom: 32,
+          }}
+        >
+          ← Voltar
+        </button>
+
+        <Logo size={36} />
+        <p
+          style={{
+            fontSize: 28,
+            fontWeight: 700,
+            color: "#fff",
+            marginTop: 16,
+            lineHeight: 1.2,
+          }}
+        >
+          Bem-vindo <span style={{ color: colors.rosa }}>de volta!</span>
+        </p>
+        <p
+          style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", marginTop: 8 }}
+        >
+          Entre na sua conta Chegô
+        </p>
+      </div>
+
+      {/* Card do formulário */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "32px 24px 40px",
+          maxWidth: 520,
+          margin: "0 auto",
+          width: "100%",
         }}
       >
         <div
           style={{
             background: "#fff",
-            borderRadius: 20,
-            padding: "28px 24px 32px",
-            boxShadow: "0 4px 32px rgba(28,10,46,0.10)",
+            borderRadius: 24,
+            padding: "32px 24px",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.3)",
             display: "flex",
             flexDirection: "column",
-            gap: 18,
+            gap: 20,
           }}
         >
           <Input
@@ -124,7 +133,7 @@ export default function LoginScreen() {
             inputMode="email"
           />
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <Input
               label="Senha"
               type={showPass ? "text" : "password"}
@@ -137,14 +146,14 @@ export default function LoginScreen() {
                 <button
                   onClick={() => setShowPass((s) => !s)}
                   style={{
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     flexShrink: 0,
                     background: colors.lilasClaro,
                     border: `1px solid ${colors.bordaLilas}`,
-                    borderRadius: 9,
+                    borderRadius: 10,
                     cursor: "pointer",
-                    fontSize: 15,
+                    fontSize: 16,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -161,7 +170,7 @@ export default function LoginScreen() {
                 background: "none",
                 border: "none",
                 color: colors.rosa,
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
                 fontFamily: "'Space Grotesk', sans-serif",
@@ -176,8 +185,8 @@ export default function LoginScreen() {
               style={{
                 background: "#fff0f3",
                 border: `1px solid ${colors.rosa}`,
-                borderRadius: 10,
-                padding: "10px 14px",
+                borderRadius: 12,
+                padding: "12px 16px",
                 fontSize: 13,
                 color: colors.rosa,
                 fontWeight: 500,
@@ -192,16 +201,18 @@ export default function LoginScreen() {
             fullWidth
             loading={loading}
             onClick={handleLogin}
-            style={{ fontSize: 15, marginTop: 2 }}
+            style={{ fontSize: 16, padding: "15px" }}
           >
             Entrar agora
           </Button>
 
+          <div style={{ height: 1, background: colors.bordaLilas }} />
+
           <p
             style={{
               textAlign: "center",
-              fontSize: 13,
-              color: "#aaa",
+              fontSize: 14,
+              color: "#888",
               margin: 0,
             }}
           >

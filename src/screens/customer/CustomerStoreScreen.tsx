@@ -32,6 +32,10 @@ export default function CustomerStoreScreen() {
   }
 
   function openProduct(product: any) {
+    console.log("🍕 openProduct chamado:", product.name, {
+      allows_half: product.allows_half,
+      size_type: product.size_type,
+    });
     setSelectedProduct(product);
     setProductQty(1);
     setProductNotes("");
@@ -65,6 +69,31 @@ export default function CustomerStoreScreen() {
     );
     setSelectedProduct(null);
     showToast(`${product.name} adicionado!`);
+  }
+
+  function handleCartItemAdd(item: CartItem) {
+    if (!store) return;
+    if (cartStoreId && cartStoreId !== store.id) {
+      setPendingProduct(item);
+      setShowDiffStoreModal(true);
+      return;
+    }
+    if (!store) return;
+    for (let i = 0; i < (item.quantity ?? 1); i++) {
+      addItem(
+        {
+          product_id: item.product_id,
+          name: item.name,
+          price: item.price,
+          image_url: item.image_url,
+          notes: item.notes,
+        },
+        store.id,
+        store.name,
+      );
+    }
+    setSelectedProduct(null);
+    showToast(`${item.name} adicionado!`);
   }
 
   function confirmClearCart() {
@@ -309,7 +338,7 @@ export default function CustomerStoreScreen() {
                 {prods.map((product) => (
                   <div
                     key={product.id}
-                    onClick={() => openProduct(product)}
+                    onClick={() => openProduct(product)} // sempre abre modal
                     style={{
                       background: "#fff",
                       borderRadius: 13,
@@ -387,7 +416,14 @@ export default function CustomerStoreScreen() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleAddToCart(product);
+                        if (
+                          product.size_type === "sizes" ||
+                          product.allows_half
+                        ) {
+                          openProduct(product);
+                        } else {
+                          handleAddToCart(product);
+                        }
                       }}
                       style={{
                         width: 28,

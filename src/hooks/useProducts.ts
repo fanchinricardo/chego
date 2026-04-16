@@ -69,12 +69,12 @@ export function useProducts(storeId: string | null) {
     const path = `${storeId}/${productId}.${ext}`;
 
     const { error } = await supabase.storage
-      .from("product-images")
+      .from("products")
       .upload(path, file, { upsert: true });
 
     if (error) throw new Error(error.message);
 
-    const { data } = supabase.storage.from("product-images").getPublicUrl(path);
+    const { data } = supabase.storage.from("products").getPublicUrl(path);
 
     return data.publicUrl;
   }
@@ -164,7 +164,7 @@ export function useProducts(storeId: string | null) {
     const product = products.find((p) => p.id === id);
     if (product?.image_url) {
       const path = product.image_url.split("/product-images/")[1];
-      if (path) await supabase.storage.from("product-images").remove([path]);
+      if (path) await supabase.storage.from("products").remove([path]);
     }
 
     setProducts((prev) => prev.filter((p) => p.id !== id));
