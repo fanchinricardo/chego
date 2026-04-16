@@ -78,7 +78,7 @@ export default function StoreBillingScreen() {
       .single();
     if (!config) return;
 
-    // Calcula vendas do mês atual
+    // Calcula vendas do mês
     const now = new Date();
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     const { data: orders } = await supabase
