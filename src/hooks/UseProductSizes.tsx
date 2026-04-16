@@ -114,3 +114,4 @@ export async function fetchSizePricesForProduct(
     .order("product_sizes(sort_order)");
   return (data ?? []) as ProductSizePrice[];
 }
+//Nova versão do hook useProductSizePrices que aceita um array de productIds para buscar os preços de vários produtos ao mesmo tempo
