@@ -88,21 +88,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setStoreName(sName);
 
     setItems((prev) => {
-      const existing = prev.find((i) => i.product_id === item.product_id);
+      // Usa product_id + name como chave única (meia pizza tem nome diferente)
+      const key = (i: any) => i.product_id + "|" + i.name;
+      const existing = prev.find((i) => key(i) === key(item));
       if (existing) {
         return prev.map((i) =>
-          i.product_id === item.product_id
-            ? { ...i, quantity: i.quantity + 1 }
-            : i,
+          key(i) === key(item) ? { ...i, quantity: i.quantity + 1 } : i,
         );
       }
       return [...prev, { ...item, quantity: 1 }];
     });
   }
 
-  function removeItem(productId: string) {
+  function removeItem(productId: string, name?: string) {
     setItems((prev) => {
-      const next = prev.filter((i) => i.product_id !== productId);
+      const next = name
+        ? prev.filter((i) => !(i.product_id === productId && i.name === name))
+        : prev.filter((i) => i.product_id !== productId);
       if (next.length === 0) {
         setStoreId(null);
         setStoreName(null);
@@ -111,14 +113,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }
 
-  function updateQty(productId: string, qty: number) {
+  function updateQty(productId: string, qty: number, name?: string) {
     if (qty <= 0) {
-      removeItem(productId);
+      removeItem(productId, name);
       return;
     }
     setItems((prev) =>
       prev.map((i) =>
-        i.product_id === productId ? { ...i, quantity: qty } : i,
+        (
+          name
+            ? i.product_id === productId && i.name === name
+            : i.product_id === productId
+        )
+          ? { ...i, quantity: qty }
+          : i,
       ),
     );
   }
