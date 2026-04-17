@@ -102,30 +102,6 @@ export function CartScreen() {
         return;
       }
 
-      const { data: existingOrder } = await supabase
-        .from("orders")
-        .select("id, total, status, payment_status")
-        .eq("customer_id", user.id)
-        .eq("store_id", storeId)
-        .in("status", ["pending"])
-        .eq("payment_status", "pending")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (existingOrder) {
-        navigate("/payment", {
-          state: {
-            orderId: existingOrder.id,
-            total: Number(existingOrder.total),
-            paymentMethod,
-            pixKey: storePixKey,
-          },
-        });
-        setSubmitting(false);
-        return;
-      }
-
       const { data: order, error: orderErr } = await supabase
         .from("orders")
         .insert({
@@ -162,6 +138,7 @@ export function CartScreen() {
           unit_price: item.price,
           total_price: item.price * item.quantity,
           notes: item.notes ?? null,
+          custom_name: item.name ?? null,
         })),
       );
       if (itemsErr) throw new Error(itemsErr.message);

@@ -521,7 +521,7 @@ function OrderCard({
   });
   const items =
     order.order_items
-      ?.map((i) => `${i.quantity}× ${i.products?.name}`)
+      ?.map((i) => `${i.quantity}× ${i.custom_name ?? i.products?.name}`)
       .join(" · ") ?? "";
 
   const PAYMENT_LABEL: Record<string, string> = {
@@ -833,10 +833,8 @@ export function BottomNav({
       style={{
         position: "fixed",
         bottom: 0,
-        left: "50%",
-        transform: "translateX(-50%)",
         width: "100%",
-        maxWidth: 480,
+        maxWidth: 520,
         background: "#fff",
         borderTop: `1px solid ${colors.bordaLilas}`,
         display: "flex",

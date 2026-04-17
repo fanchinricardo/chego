@@ -150,7 +150,7 @@ export function useCustomerOrders(customerId: string | null) {
         `
         *,
         stores ( name, logo_url ),
-        order_items ( quantity, unit_price, products(name) )
+        order_items ( quantity, unit_price, custom_name, products(name) )
       `,
       )
       .eq("customer_id", customerId)

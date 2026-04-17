@@ -78,7 +78,7 @@ export default function StoreBillingScreen() {
       .single();
     if (!config) return;
 
-    // Calcula vendas do mês
+    // Calcula vendas do mês atual
     const now = new Date();
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     const { data: orders } = await supabase
@@ -359,6 +359,90 @@ export default function StoreBillingScreen() {
           gap: 12,
         }}
       >
+        {/* ── Card próxima fatura estimada ── */}
+        {nextInvoice && (
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 14,
+              border: `1px solid ${colors.bordaLilas}`,
+              padding: "14px 16px",
+            }}
+          >
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#aaa",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: 12,
+              }}
+            >
+              📊 Próxima fatura estimada
+            </p>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-end",
+              }}
+            >
+              <div>
+                <p style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
+                  Vendas este mês:{" "}
+                  <strong style={{ color: colors.noite }}>
+                    R$ {nextInvoice.salesTotal.toFixed(2)}
+                  </strong>
+                </p>
+                <p style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
+                  {nextInvoice.pct}% sobre vendas → vence dia{" "}
+                  <strong style={{ color: colors.noite }}>
+                    {nextInvoice.dueDay}
+                  </strong>
+                </p>
+                <p style={{ fontSize: 10, color: "#aaa" }}>
+                  Atualizado em tempo real
+                </p>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <p
+                  style={{
+                    fontFamily: "'Righteous', cursive",
+                    fontSize: 28,
+                    color: colors.rosa,
+                    lineHeight: 1,
+                  }}
+                >
+                  R$ {nextInvoice.amount.toFixed(2)}
+                </p>
+                <p style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>
+                  estimativa
+                </p>
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: 10,
+                height: 4,
+                background: colors.bordaLilas,
+                borderRadius: 4,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  background: colors.rosa,
+                  borderRadius: 4,
+                  width: `${Math.min((nextInvoice.salesTotal / Math.max(nextInvoice.salesTotal * 2, 1)) * 100, 100)}%`,
+                  transition: "width 0.5s",
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div
             style={{ display: "flex", justifyContent: "center", padding: 40 }}

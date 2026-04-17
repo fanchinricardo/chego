@@ -1,0 +1,45 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  min-height: 100dvh;
+}
+
+body {
+  background: #1c0a2e;
+  font-family: "Space Grotesk", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  justify-content: center;
+}
+
+#root {
+  width: 100%;
+  max-width: 520px;
+  min-height: 100dvh;
+  background: #f5f0ff;
+  position: relative;
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.5);
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(233, 30, 140, 0.3);
+  border-radius: 2px;
+}
+
+button,
+input,
+textarea,
+select {
+  outline: none;
+  font-family: inherit;
+}

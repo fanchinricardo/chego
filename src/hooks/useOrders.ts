@@ -18,6 +18,7 @@ export interface OrderItem {
   unit_price: number;
   total_price: number;
   notes: string | null;
+  custom_name: string | null;
   products: { name: string; image_url: string | null };
 }
 
@@ -76,14 +77,14 @@ export function useOrders(storeId: string | null) {
         *,
         profiles ( full_name, phone ),
         order_items (
-          id, product_id, quantity, unit_price, total_price, notes,
+          id, product_id, quantity, unit_price, total_price, notes, custom_name,
           products ( name, image_url )
         )
       `,
       )
       .eq("store_id", storeId)
       .gte("created_at", today.toISOString())
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: true });
 
     if (err) {
       setError(err.message);

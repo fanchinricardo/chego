@@ -135,7 +135,10 @@ export function CustomerOrdersScreen() {
           });
           const itemNames =
             order.order_items
-              ?.map((i: any) => `${i.quantity}× ${i.products?.name}`)
+              ?.map(
+                (i: any) =>
+                  `${i.quantity}× ${(i as any).custom_name ?? i.products?.name}`,
+              )
               .join(", ") ?? "";
 
           return (
@@ -540,7 +543,7 @@ export function CustomerTrackingScreen() {
         }}
       >
         {/* Mapa GPS */}
-        {(isDelivery || isDelivered) && (
+        {isDelivery && (
           <div
             style={{
               borderRadius: 14,
@@ -878,7 +881,8 @@ export function CustomerTrackingScreen() {
               }}
             >
               <span style={{ fontSize: 12, color: colors.noite }}>
-                {item.quantity}× {item.products?.name}
+                {item.quantity}×{" "}
+                {(item as any).custom_name ?? item.products?.name}
               </span>
               <span
                 style={{ fontSize: 12, fontWeight: 600, color: colors.rosa }}

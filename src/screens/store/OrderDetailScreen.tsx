@@ -21,7 +21,7 @@ const STATUS_NEXT: Partial<
   pending: { label: "Confirmar e preparar", next: "confirmed" },
   confirmed: { label: "Iniciar preparo", next: "preparing" },
   preparing: { label: "Marcar como pronto", next: "ready" },
-  ready: { label: "Iniciar entrega", next: "in_delivery" },
+  // ready: removido — entrega é iniciada via tela de Rotas
 };
 
 export default function OrderDetailScreen() {
@@ -45,7 +45,7 @@ export default function OrderDetailScreen() {
     supabase
       .from("orders")
       .select(
-        `*, profiles(full_name, phone), order_items(*, products(name, image_url))`,
+        "*, profiles(full_name, phone), order_items(*, products(name, image_url))",
       )
       .eq("id", id)
       .single()
@@ -62,7 +62,6 @@ export default function OrderDetailScreen() {
       await supabase.from("orders").update({ status: next }).eq("id", order.id);
       setOrder((prev) => (prev ? { ...prev, status: next } : prev));
       showToast(`Pedido ${STATUS_LABEL[next].toLowerCase()}!`);
-      // Notificações WhatsApp
       if (next === "preparing") notify.orderPreparing(order.id);
       if (next === "delivered") setTimeout(() => navigate(-1), 1500);
     } catch {
@@ -189,6 +188,9 @@ export default function OrderDetailScreen() {
       <div
         style={{
           padding: "16px",
+          maxWidth: 520,
+          margin: "0 auto",
+          width: "100%",
           display: "flex",
           flexDirection: "column",
           gap: 12,
@@ -237,7 +239,7 @@ export default function OrderDetailScreen() {
                   </span>
                   <div>
                     <p style={{ fontSize: 13, color: colors.noite }}>
-                      {item.products?.name}
+                      {(item as any).custom_name ?? item.products?.name}
                     </p>
                     {item.notes && (
                       <p style={{ fontSize: 11, color: "#aaa" }}>
@@ -471,49 +473,41 @@ export default function OrderDetailScreen() {
         {/* Ações */}
         {order.status !== "cancelled" && (
           <>
-            {/* Status ready — diferencia entrega de retirada */}
-            {order.status === "ready" ? (
-              (order as any).delivery_type === "pickup" ? (
-                <button
-                  onClick={() => handleUpdateStatus("delivered")}
-                  disabled={saving}
-                  style={{
-                    width: "100%",
-                    padding: "14px",
-                    borderRadius: 13,
-                    background: "#22c55e",
-                    color: "#fff",
-                    border: "none",
-                    fontSize: 15,
-                    fontWeight: 700,
-                    cursor: saving ? "not-allowed" : "pointer",
-                    opacity: saving ? 0.7 : 1,
-                    fontFamily: "'Space Grotesk', sans-serif",
-                  }}
-                >
-                  {saving ? "Atualizando..." : "🏪 Confirmar retirada"}
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleUpdateStatus("in_delivery")}
-                  disabled={saving}
-                  style={{
-                    width: "100%",
-                    padding: "14px",
-                    borderRadius: 13,
-                    background: colors.rosa,
-                    color: "#fff",
-                    border: "none",
-                    fontSize: 15,
-                    fontWeight: 700,
-                    cursor: saving ? "not-allowed" : "pointer",
-                    opacity: saving ? 0.7 : 1,
-                    fontFamily: "'Space Grotesk', sans-serif",
-                  }}
-                >
-                  {saving ? "Atualizando..." : "🛵 Iniciar entrega"}
-                </button>
-              )
+            {order.status === "ready" &&
+            (order as any).delivery_type === "pickup" ? (
+              <button
+                onClick={() => handleUpdateStatus("delivered")}
+                disabled={saving}
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  borderRadius: 13,
+                  background: "#22c55e",
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: saving ? "not-allowed" : "pointer",
+                  opacity: saving ? 0.7 : 1,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                {saving ? "Atualizando..." : "🏪 Confirmar retirada"}
+              </button>
+            ) : order.status === "ready" ? (
+              <div
+                style={{
+                  background: colors.lilasClaro,
+                  borderRadius: 12,
+                  padding: "12px 14px",
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ fontSize: 13, color: "#7e22ce", fontWeight: 600 }}>
+                  🗺️ Pedido pronto! Crie uma rota na aba <strong>Rota</strong>{" "}
+                  para iniciar a entrega.
+                </p>
+              </div>
             ) : nextAction ? (
               <button
                 onClick={() => handleUpdateStatus(nextAction.next)}
