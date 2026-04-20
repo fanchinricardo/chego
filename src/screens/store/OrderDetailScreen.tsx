@@ -62,7 +62,9 @@ export default function OrderDetailScreen() {
       await supabase.from("orders").update({ status: next }).eq("id", order.id);
       setOrder((prev) => (prev ? { ...prev, status: next } : prev));
       showToast(`Pedido ${STATUS_LABEL[next].toLowerCase()}!`);
+      if (next === "confirmed") notify.orderConfirmed(order.id);
       if (next === "preparing") notify.orderPreparing(order.id);
+      if (next === "ready") notify.orderReady(order.id);
       if (next === "delivered") setTimeout(() => navigate(-1), 1500);
     } catch {
       showToast("Erro ao atualizar", "error");

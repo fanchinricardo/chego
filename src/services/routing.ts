@@ -1,7 +1,5 @@
 // Serviço de otimização de rota
 // Usa OSRM (Open Source Routing Machine) — gratuito e sem chave de API
-// Documentação: http://project-osrm.org/docs/v5.24.0/api/
-// Para produção, considere Google Routes API ou aqui.com Routes API
 
 export interface Waypoint {
   order_id: string;
@@ -31,24 +29,58 @@ export interface OptimizationResult {
   total_duration_min: number;
 }
 
-const OSRM_BASE = "https://router.project-osrm.org";
+const OSRM_BASE = "https://routing.openstreetmap.de/routed-car";
 
-// Geocodifica um endereço usando Nominatim (OpenStreetMap) — gratuito
-export async function geocodeAddress(
-  address: string,
-): Promise<{ lat: number; lng: number } | null> {
-  try {
-    const query = encodeURIComponent(address + ", Brasil");
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`,
-      { headers: { "Accept-Language": "pt-BR" } },
-    );
-    const data = await res.json();
-    if (!data.length) return null;
-    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  } catch {
-    return null;
+// Geocodificação via ViaCEP + Nominatim (ambos permitem CORS do browser)
+export async function geocodeAddress(input: {
+  address: string;
+  city: string;
+  state: string;
+  zip_code: string;
+}): Promise<{ lat: number; lng: number } | null> {
+  console.log("🗺️ geocodeAddress chamado:", input);
+  const cep = input.zip_code.replace(/\D/g, "");
+
+  let cidade = input.city;
+  let uf = input.state;
+
+  // 1. ViaCEP — pega cidade/estado oficial pelo CEP
+  if (cep.length === 8) {
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      if (r.ok) {
+        const d = await r.json();
+        if (!d.erro && d.localidade) {
+          cidade = d.localidade;
+          uf = d.uf;
+        }
+      }
+    } catch (e) {
+      console.warn("ViaCEP erro:", e);
+    }
   }
+
+  // 2. Nominatim com cidade + estado
+  if (cidade) {
+    try {
+      const q = encodeURIComponent(`${cidade}, ${uf}, Brasil`);
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1&countrycodes=br`,
+      );
+      if (r.ok) {
+        const d = await r.json();
+        if (d?.length > 0) {
+          console.log("✅ Geocode OK:", cidade, d[0].lat, d[0].lon);
+          return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+        }
+      }
+    } catch (e) {
+      console.warn("Nominatim erro:", e);
+    }
+  }
+
+  console.warn("❌ Geocode falhou:", cidade, uf);
+  return null;
 }
 
 // Otimiza a ordem das paradas usando OSRM Trip (Traveling Salesman)
@@ -60,8 +92,38 @@ export async function optimizeRoute(
     return { stops: [], total_distance_km: 0, total_duration_min: 0 };
   }
 
-  // Se só 1 parada, não precisa otimizar
+  // Para 1 ou mais paradas, usa OSRM para distância real por estrada
+  // (não usa haversine pois gera distância em linha reta incorreta)
+
+  // Para 1 parada usa /route (mais simples e confiável)
   if (waypoints.length === 1) {
+    try {
+      const wp = waypoints[0];
+      const coords = `${origin.lng},${origin.lat};${wp.lng},${wp.lat}`;
+      const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.code === "Ok" && data.routes?.length) {
+        const route = data.routes[0];
+        const distKm = Math.round((route.distance / 1000) * 10) / 10;
+        const durMin = Math.ceil(route.duration / 60);
+        return {
+          stops: [
+            {
+              ...wp,
+              stop_number: 1,
+              distance_km: distKm,
+              duration_min: durMin,
+              delivered_at: null,
+            },
+          ],
+          total_distance_km: distKm,
+          total_duration_min: durMin,
+        };
+      }
+    } catch (_) {}
+    // fallback haversine só se OSRM falhar
     const wp = waypoints[0];
     const dist = haversineKm(origin.lat, origin.lng, wp.lat, wp.lng);
     return {
@@ -70,7 +132,7 @@ export async function optimizeRoute(
           ...wp,
           stop_number: 1,
           distance_km: Math.round(dist * 10) / 10,
-          duration_min: Math.ceil(dist * 3), // ~20km/h média urbana
+          duration_min: Math.ceil(dist * 3),
           delivered_at: null,
         },
       ],
@@ -86,7 +148,7 @@ export async function optimizeRoute(
       ...waypoints.map((w) => `${w.lng},${w.lat}`),
     ].join(";");
 
-    const url = `${OSRM_BASE}/trip/v1/driving/${coords}?source=first&roundtrip=false&annotations=false&steps=false`;
+    const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&roundtrip=false&annotations=false&steps=false`;
     const res = await fetch(url);
     const data = await res.json();
 

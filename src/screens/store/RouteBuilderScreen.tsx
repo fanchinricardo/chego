@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useStore } from "../../hooks/useStore";
-import { useOrders } from "../../hooks/useOrders";
+import { useReadyOrders } from "../../hooks/useOrders";
 import { useMotoboys } from "../../hooks/useRoutes";
 import {
   optimizeRoute,
@@ -15,7 +15,7 @@ import { BottomNav } from "./StoreDashboard";
 export default function RouteBuilderScreen() {
   const navigate = useNavigate();
   const { store } = useStore();
-  const { orders, loading: ordersLoading } = useOrders(store?.id ?? null);
+  const { orders, loading: ordersLoading } = useReadyOrders(store?.id ?? null);
   const { motoboys, loading: motoboyLoading } = useMotoboys(store?.id ?? null);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());

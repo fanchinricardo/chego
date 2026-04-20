@@ -91,7 +91,9 @@ export default function StoreDashboard() {
     try {
       await updateStatus(orderId, next);
       showToast(`Pedido ${STATUS_LABEL[next].toLowerCase()}!`);
+      if (next === "confirmed") notify.orderConfirmed(orderId);
       if (next === "preparing") notify.orderPreparing(orderId);
+      if (next === "ready") notify.orderReady(orderId);
     } catch {
       showToast("Erro ao atualizar pedido", "error");
     }

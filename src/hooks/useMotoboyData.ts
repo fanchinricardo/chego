@@ -175,6 +175,36 @@ export function useMotoboyData() {
     await fetchActiveRoute();
   }
 
+  async function rejectRoute(routeId: string) {
+    // 1. Busca as paradas da rota diretamente do banco
+    const { data: routeDeliveries } = await supabase
+      .from("deliveries")
+      .select("order_id")
+      .eq("route_id", routeId);
+
+    // 2. Volta os pedidos para 'ready'
+    if (routeDeliveries && routeDeliveries.length > 0) {
+      await supabase
+        .from("orders")
+        .update({ status: "ready" })
+        .in(
+          "id",
+          routeDeliveries.map((d) => d.order_id),
+        );
+    }
+
+    // 3. Marca rota como rejeitada
+    await supabase
+      .from("delivery_routes")
+      .update({ status: "rejected" })
+      .eq("id", routeId);
+
+    // 4. Notifica comércio via WhatsApp
+    notify.routeRejected(routeId);
+
+    await fetchActiveRoute();
+  }
+
   // Confirma entrega de uma parada
   async function confirmDelivery(
     orderId: string,
@@ -255,6 +285,7 @@ export function useMotoboyData() {
     stats,
     loading,
     acceptRoute,
+    rejectRoute,
     confirmDelivery,
     refetch: () =>
       Promise.all([fetchProfile(), fetchActiveRoute(), fetchHistory()]),

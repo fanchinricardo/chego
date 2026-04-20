@@ -275,7 +275,7 @@ export function CustomerTrackingScreen() {
     supabase
       .from("orders")
       .select(
-        "*, stores(name, logo_url), order_items(quantity, unit_price, products(name))",
+        "*, stores(name, logo_url), order_items(quantity, unit_price, custom_name, products(name))",
       )
       .eq("id", id)
       .single()

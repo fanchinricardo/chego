@@ -155,3 +155,33 @@ export function useOrders(storeId: string | null) {
 
   return { orders, stats, loading, error, updateStatus, refetch: fetchOrders };
 }
+
+// Hook específico para pedidos prontos (sem filtro de data — para criar rotas)
+export function useReadyOrders(storeId: string | null) {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!storeId) return;
+    supabase
+      .from("orders")
+      .select(
+        `
+        *,
+        profiles ( full_name, phone ),
+        order_items ( id, product_id, quantity, unit_price, total_price, notes, custom_name,
+          products ( name, image_url )
+        )
+      `,
+      )
+      .eq("store_id", storeId)
+      .eq("status", "ready")
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        setOrders((data ?? []) as Order[]);
+        setLoading(false);
+      });
+  }, [storeId]);
+
+  return { orders, loading };
+}

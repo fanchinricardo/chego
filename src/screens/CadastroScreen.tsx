@@ -201,14 +201,19 @@ export default function CadastroScreen() {
         <button
           onClick={back}
           style={{
-            background: "none",
-            border: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            background: "rgba(255,255,255,0.12)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            borderRadius: 10,
+            padding: "8px 16px",
             cursor: "pointer",
-            color: "rgba(255,255,255,0.35)",
+            color: "#fff",
             fontSize: 13,
+            fontWeight: 600,
             fontFamily: "'Space Grotesk', sans-serif",
-            marginBottom: 14,
-            padding: 0,
+            marginBottom: 20,
           }}
         >
           ← Voltar
@@ -239,7 +244,6 @@ export default function CadastroScreen() {
       </div>
       {/* fecha maxWidth header */}
 
-      {/* ── Corpo ── */}
       <div
         style={{
           flex: 1,

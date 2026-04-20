@@ -125,12 +125,22 @@ export function ProductModal({
     );
 
   function handleAdd() {
+    // Validação: meia pizza selecionada mas sem escolher o segundo sabor
+    if (wantsHalf && !halfProduct) {
+      alert("Escolha o segundo sabor da meia pizza!");
+      return;
+    }
     const item: CartItem = {
       product_id: product.id,
-      name:
-        wantsHalf && halfProduct
-          ? `½ ${product.name} + ½ ${halfProduct.name}`
-          : product.name,
+      name: (() => {
+        const sizePart = selectedSize?.product_sizes?.name
+          ? ` (${selectedSize.product_sizes.name})`
+          : "";
+        if (wantsHalf && halfProduct) {
+          return `½ ${product.name} + ½ ${halfProduct.name}${sizePart}`;
+        }
+        return `${product.name}${sizePart}`;
+      })(),
       price: unitPrice,
       image_url: product.image_url,
       notes: notes.trim() || undefined,
@@ -591,19 +601,45 @@ export function ProductModal({
           </div>
 
           {/* ── Botão adicionar ── */}
+          {/* Aviso quando meia pizza sem escolher sabor */}
+          {wantsHalf && !halfProduct && (
+            <div
+              style={{
+                background: "#fff0f3",
+                border: `1px solid ${colors.rosa}`,
+                borderRadius: 10,
+                padding: "10px 14px",
+                fontSize: 13,
+                color: colors.rosa,
+                fontWeight: 500,
+                textAlign: "center",
+              }}
+            >
+              ⚠ Escolha o segundo sabor da meia pizza
+            </div>
+          )}
+
           <button
             onClick={handleAdd}
-            disabled={hasSizes && !selectedSize}
+            disabled={
+              (hasSizes && !selectedSize) || (wantsHalf && !halfProduct)
+            }
             style={{
               width: "100%",
               padding: "14px",
               borderRadius: 13,
-              background: hasSizes && !selectedSize ? "#ccc" : colors.rosa,
+              background:
+                (hasSizes && !selectedSize) || (wantsHalf && !halfProduct)
+                  ? "#ccc"
+                  : colors.rosa,
               color: "#fff",
               border: "none",
               fontSize: 15,
               fontWeight: 700,
-              cursor: hasSizes && !selectedSize ? "not-allowed" : "pointer",
+              cursor:
+                (hasSizes && !selectedSize) || (wantsHalf && !halfProduct)
+                  ? "not-allowed"
+                  : "pointer",
               fontFamily: "'Space Grotesk', sans-serif",
             }}
           >

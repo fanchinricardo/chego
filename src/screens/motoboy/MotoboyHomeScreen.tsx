@@ -8,8 +8,16 @@ import { RouteStop } from "../../hooks/useRoutes";
 export default function MotoboyHomeScreen() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { profile, activeRoute, stops, history, stats, loading, acceptRoute } =
-    useMotoboyData();
+  const {
+    profile,
+    activeRoute,
+    stops,
+    history,
+    stats,
+    loading,
+    acceptRoute,
+    rejectRoute,
+  } = useMotoboyData();
 
   const [accepting, setAccepting] = useState(false);
   const [toast, setToast] = useState("");
@@ -46,7 +54,9 @@ export default function MotoboyHomeScreen() {
           justifyContent: "center",
         }}
       >
-        <Spinner size={36} />
+        <div style={{ maxWidth: 520, margin: "0 auto" }}>
+          <Spinner size={36} />
+        </div>
       </div>
     );
 
@@ -345,6 +355,7 @@ export default function MotoboyHomeScreen() {
                   {accepting ? "Aceitando..." : "✓ Aceitar rota"}
                 </button>
                 <button
+                  onClick={() => activeRoute && rejectRoute(activeRoute.id)}
                   style={{
                     flex: 1,
                     padding: "11px",

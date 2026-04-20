@@ -100,7 +100,7 @@ export default function SplashScreen() {
           onClick={() => navigate("/cadastro")}
           style={{ fontSize: 15 }}
         >
-          Criar conta grátis
+          Criar conta
         </Button>
         <p
           style={{

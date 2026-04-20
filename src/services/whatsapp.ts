@@ -27,12 +27,18 @@ export const notify = {
   orderCreated: (order_id: string) =>
     callNotify({ event: "order_created", order_id }),
   // Cliente recebe quando comércio inicia preparo
+  orderConfirmed: (order_id: string) =>
+    callNotify({ event: "order_confirmed", order_id }),
   orderPreparing: (order_id: string) =>
     callNotify({ event: "order_preparing", order_id }),
+  orderReady: (order_id: string) =>
+    callNotify({ event: "order_ready", order_id }),
   // Motoboy recebe quando comércio cria a rota
   routeStarted: (route_id: string) =>
     callNotify({ event: "route_started", route_id }),
   // Clientes recebem quando motoboy aceita a rota
   routeAccepted: (route_id: string) =>
     callNotify({ event: "route_accepted", route_id }),
+  routeRejected: (route_id: string) =>
+    callNotify({ event: "route_rejected", route_id }),
 };
