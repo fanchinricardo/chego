@@ -2,7 +2,7 @@ import { useState } from "react";
 import Swal from "sweetalert2";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-import { usePDVOrder } from "../../hooks/usePDV";
+import { usePDVOrder } from "../../hooks/usePdv";
 import { colors, Spinner, Toast } from "../../components/ui";
 
 interface Payment {
