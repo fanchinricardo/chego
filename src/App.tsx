@@ -28,6 +28,13 @@ import StoreScheduleScreen from "./screens/store/StoreScheduleScreen";
 import StoreChangeEmailScreen from "./screens/store/StoreChangeEmailScreen";
 import StoreSizesScreen from "./screens/store/StoreSizesScreen";
 import ProductSizePricesScreen from "./screens/store/ProductSizePricesScreen";
+import StoreTablesScreen from "./screens/store/StoreTablesScreen";
+import StoreWaiterScreen from "./screens/store/StoreWaiterScreen";
+import StoreKitchenScreen from "./screens/store/StoreKitchenScreen";
+import KitchenScreen from "./screens/kitchen/KitchenScreen";
+import WaiterBillScreen from "./screens/waiter/WaiterBillScreen";
+import WaiterTablesScreen from "./screens/waiter/WaiterTablesScreen";
+import WaiterOrderScreen from "./screens/waiter/WaiterOrderScreen";
 import StoreBillingScreen from "./screens/store/StoreBillingScreen";
 import RouteBuilderScreen from "./screens/store/RouteBuilderScreen";
 import RouteConfirmScreen from "./screens/store/RouteConfirmScreen";
@@ -139,6 +146,8 @@ function PrivateRoute({
       admin: "/admin",
       store: "/store",
       motoboy: "/motoboy",
+      waiter: "/waiter",
+      kitchen: "/kitchen",
       customer: "/home",
     };
     return <Navigate to={map[profile.role] ?? "/"} replace />;
@@ -161,6 +170,8 @@ function PublicRoute({ children }: { children: JSX.Element }) {
       admin: "/admin",
       store: "/store",
       motoboy: "/motoboy",
+      waiter: "/waiter",
+      kitchen: "/kitchen",
       customer: "/home",
     };
     return <Navigate to={map[profile.role] ?? "/home"} replace />;
@@ -338,6 +349,64 @@ export default function App() {
               element={
                 <PrivateRoute allowedRoles={["store"]}>
                   <StoreChangeEmailScreen />
+                </PrivateRoute>
+              }
+            />
+            {/* Garçom */}
+            <Route
+              path="/kitchen"
+              element={
+                <PrivateRoute allowedRoles={["kitchen"]}>
+                  <KitchenScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/waiter"
+              element={
+                <PrivateRoute allowedRoles={["waiter"]}>
+                  <WaiterTablesScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/waiter/bill/:tableId"
+              element={
+                <PrivateRoute allowedRoles={["waiter"]}>
+                  <WaiterBillScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/waiter/table/:tableId"
+              element={
+                <PrivateRoute allowedRoles={["waiter"]}>
+                  <WaiterOrderScreen />
+                </PrivateRoute>
+              }
+            />
+
+            <Route
+              path="/store/tables"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <StoreTablesScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/store/kitchen"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <StoreKitchenScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/store/waiters"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <StoreWaiterScreen />
                 </PrivateRoute>
               }
             />

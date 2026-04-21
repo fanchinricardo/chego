@@ -1,3 +1,4 @@
+import Swal from "sweetalert2";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../../hooks/useStore";
@@ -41,7 +42,16 @@ export default function StoreSizesScreen() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Remover este tamanho?")) return;
+    const { isConfirmed } = await Swal.fire({
+      title: "Remover tamanho?",
+      text: "Produtos com este tamanho perderão o preço associado.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sim, remover",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#e9181c",
+    });
+    if (!isConfirmed) return;
     try {
       await deleteSize(id);
       showToast("Tamanho removido");

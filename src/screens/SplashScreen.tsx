@@ -14,6 +14,8 @@ export default function SplashScreen() {
         admin: "/admin",
         store: "/store",
         motoboy: "/motoboy",
+        waiter: "/waiter",
+        kitchen: "/kitchen",
         customer: "/home",
       };
       navigate(routes[profile.role] ?? "/home", { replace: true });
@@ -100,7 +102,7 @@ export default function SplashScreen() {
           onClick={() => navigate("/cadastro")}
           style={{ fontSize: 15 }}
         >
-          Criar conta
+          Criar conta grátis
         </Button>
         <p
           style={{

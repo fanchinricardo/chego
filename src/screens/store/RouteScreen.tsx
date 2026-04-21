@@ -1,3 +1,4 @@
+import Swal from "sweetalert2";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -29,7 +30,16 @@ export default function RouteScreen() {
   );
 
   async function handleCancel(routeId: string) {
-    if (!confirm("Cancelar esta rota?")) return;
+    const { isConfirmed } = await Swal.fire({
+      title: "Cancelar esta rota?",
+      text: 'Os pedidos voltarão para "Pronto para entrega".',
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sim, cancelar",
+      cancelButtonText: "Voltar",
+      confirmButtonColor: "#e9181c",
+    });
+    if (!isConfirmed) return;
     try {
       await cancelRoute(routeId);
       showToast("Rota cancelada");

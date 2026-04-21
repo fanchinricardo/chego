@@ -329,6 +329,9 @@ export default function StoreProfileScreen() {
                 label: "Faturamento e faturas",
                 path: "/store/billing",
               },
+              { icon: "🪑", label: "Mesas", path: "/store/tables" },
+              { icon: "🧑‍🍳", label: "Garçons", path: "/store/waiters" },
+              { icon: "👨‍🍳", label: "Cozinha", path: "/store/kitchen" },
               {
                 icon: "📐",
                 label: "Tamanhos de produto",

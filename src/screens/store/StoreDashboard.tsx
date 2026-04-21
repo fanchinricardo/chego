@@ -1,3 +1,4 @@
+import Swal from "sweetalert2";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../../hooks/useStore";
@@ -736,8 +737,17 @@ function OrderCard({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (confirm("Cancelar este pedido?"))
-                    onUpdateStatus(order.id, "cancelled");
+                  Swal.fire({
+                    title: "Cancelar pedido?",
+                    text: "Esta ação não pode ser desfeita.",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonText: "Sim, cancelar",
+                    cancelButtonText: "Voltar",
+                    confirmButtonColor: "#e9181c",
+                  }).then(({ isConfirmed }) => {
+                    if (isConfirmed) onUpdateStatus(order.id, "cancelled");
+                  });
                 }}
                 style={{
                   padding: "6px 12px",

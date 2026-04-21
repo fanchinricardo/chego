@@ -26,8 +26,9 @@ export interface SignUpData {
   email: string;
   password: string;
   full_name: string;
+  store_id?: string | null;
   phone: string;
-  role: "customer" | "store" | "motoboy";
+  role: "customer" | "store" | "motoboy" | "waiter" | "kitchen" | "admin";
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -79,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, phone, role, created_at")
+        .select("id, full_name, phone, role, store_id, created_at")
         .eq("id", u.id)
         .maybeSingle();
 
@@ -92,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 2. Profile não existe — cria via RPC
     const meta = u.user_metadata ?? {};
-    const validRoles = ["store", "customer", "motoboy"];
+    const validRoles = ["store", "customer", "motoboy", "waiter", "kitchen"];
     const role = validRoles.includes(meta.role) ? meta.role : "customer";
     const full_name =
       meta.full_name?.trim() ||
@@ -144,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: {
         data: {
           full_name: data.full_name,
+          store_id: data.store_id ?? null,
           phone: data.phone,
           role: data.role,
         },
