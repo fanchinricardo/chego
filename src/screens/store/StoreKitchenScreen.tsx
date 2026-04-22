@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useStore } from "../../hooks/useStore";
+import { useProducts } from "../../hooks/useProducts";
 import { colors, Input, Button, Spinner, Toast } from "../../components/ui";
 import { BottomNav } from "./StoreDashboard";
 import Swal from "sweetalert2";
@@ -11,6 +12,7 @@ interface KitchenUser {
   full_name: string;
   phone: string | null;
   created_at: string;
+  kitchen_categories: string[];
 }
 
 export default function StoreKitchenScreen() {
@@ -24,7 +26,13 @@ export default function StoreKitchenScreen() {
   const [toast, setToast] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
 
-  const [form, setForm] = useState({ full_name: "", email: "", password: "" });
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    categories: [] as string[],
+  });
+  const { categories } = useProducts(store?.id ?? null);
 
   function showToast(msg: string, type: "success" | "error" = "success") {
     setToast(msg);
@@ -37,7 +45,7 @@ export default function StoreKitchenScreen() {
     setLoading(true);
     const { data } = await supabase
       .from("profiles")
-      .select("id, full_name, phone, created_at")
+      .select("id, full_name, phone, created_at, kitchen_categories")
       .eq("role", "kitchen")
       .eq("store_id", store.id)
       .order("created_at", { ascending: false });
@@ -74,6 +82,7 @@ export default function StoreKitchenScreen() {
             email: form.email.trim().toLowerCase(),
             password: form.password,
             store_id: store.id,
+            kitchen_categories: form.categories,
           },
         },
       );
@@ -101,12 +110,16 @@ export default function StoreKitchenScreen() {
       confirmButtonColor: "#e9181c",
     });
     if (!isConfirmed) return;
-    await supabase
-      .from("profiles")
-      .update({ store_id: null, role: "customer" })
-      .eq("id", userId);
-    showToast("Acesso removido");
-    await fetchUsers();
+    try {
+      const { data, error } = await supabase.functions.invoke("remove-staff", {
+        body: { user_id: userId },
+      });
+      if (error || data?.error) throw new Error(error?.message ?? data?.error);
+      showToast("Acesso removido");
+      await fetchUsers();
+    } catch (e: any) {
+      showToast(e.message, "error");
+    }
   }
 
   return (
@@ -237,6 +250,67 @@ export default function StoreKitchenScreen() {
                   setForm((f) => ({ ...f, password: e.target.value }))
                 }
               />
+              {/* Seleção de categorias */}
+              <div>
+                <p
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#aaa",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    marginBottom: 8,
+                  }}
+                >
+                  Categorias (deixe vazio para ver tudo)
+                </p>
+                {categories.length === 0 ? (
+                  <p style={{ fontSize: 12, color: "#aaa" }}>
+                    Nenhuma categoria encontrada
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {categories.map((cat) => {
+                      const selected = form.categories.includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              categories: selected
+                                ? f.categories.filter((c) => c !== cat)
+                                : [...f.categories, cat],
+                            }))
+                          }
+                          style={{
+                            padding: "6px 14px",
+                            borderRadius: 20,
+                            background: selected
+                              ? colors.rosa
+                              : colors.lilasClaro,
+                            color: selected ? "#fff" : "#7e22ce",
+                            border: "none",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          {selected ? "✓ " : ""}
+                          {cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {form.categories.length === 0 && (
+                  <p style={{ fontSize: 11, color: "#aaa", marginTop: 6 }}>
+                    Sem filtro — verá todos os itens
+                  </p>
+                )}
+              </div>
               <Button
                 variant="primary"
                 fullWidth
@@ -307,11 +381,11 @@ export default function StoreKitchenScreen() {
                 >
                   {u.full_name}
                 </p>
-                {u.phone && (
-                  <p style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
-                    {u.phone}
-                  </p>
-                )}
+                <p style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
+                  {u.kitchen_categories?.length > 0
+                    ? u.kitchen_categories.join(", ")
+                    : "Todas as categorias"}
+                </p>
               </div>
               <button
                 onClick={() => handleRemove(u.id)}

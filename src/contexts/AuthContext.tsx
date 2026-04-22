@@ -27,6 +27,7 @@ export interface SignUpData {
   password: string;
   full_name: string;
   store_id?: string | null;
+  kitchen_categories?: string[];
   phone: string;
   role: "customer" | "store" | "motoboy" | "waiter" | "kitchen" | "admin";
 }
@@ -80,7 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, phone, role, store_id, created_at")
+        .select(
+          "id, full_name, phone, role, store_id, kitchen_categories, created_at",
+        )
         .eq("id", u.id)
         .maybeSingle();
 
@@ -146,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: {
           full_name: data.full_name,
           store_id: data.store_id ?? null,
+          kitchen_categories: data.kitchen_categories ?? [],
           phone: data.phone,
           role: data.role,
         },

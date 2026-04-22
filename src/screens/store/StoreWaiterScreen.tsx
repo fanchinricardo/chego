@@ -117,10 +117,10 @@ export default function StoreWaiterScreen() {
     });
     if (!isConfirmed) return;
     try {
-      await supabase
-        .from("profiles")
-        .update({ store_id: null, role: "customer" })
-        .eq("id", waiterId);
+      const { data, error } = await supabase.functions.invoke("remove-staff", {
+        body: { user_id: waiterId },
+      });
+      if (error || data?.error) throw new Error(error?.message ?? data?.error);
       showToast("Garçom removido");
       await fetchWaiters();
     } catch (e: any) {

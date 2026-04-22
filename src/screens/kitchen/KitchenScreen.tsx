@@ -14,6 +14,7 @@ interface KitchenItem {
   table_number: number | null;
   table_name: string | null;
   waiter_name: string | null;
+  category: string | null;
 }
 
 const STATUS_CFG = {
@@ -64,6 +65,7 @@ const FILTERS = [
 
 export default function KitchenScreen() {
   const { profile, signOut } = useAuth();
+  const kitchenCategories: string[] = profile?.kitchen_categories ?? [];
   const storeId = profile?.store_id ?? null;
 
   const [items, setItems] = useState<KitchenItem[]>([]);
@@ -92,7 +94,9 @@ export default function KitchenScreen() {
     // 2. Busca os itens desses pedidos
     const { data } = await supabase
       .from("pdv_order_items")
-      .select("id, name, quantity, notes, status, created_at, order_id")
+      .select(
+        "id, name, quantity, notes, status, created_at, order_id, product_id, products(category)",
+      )
       .in("order_id", orderIds)
       .in("status", ["pending", "preparing", "ready"])
       .order("created_at", { ascending: true });
@@ -115,6 +119,7 @@ export default function KitchenScreen() {
         table_number: order?.pdv_tables?.number ?? null,
         table_name: order?.pdv_tables?.name ?? null,
         waiter_name: order?.profiles?.full_name ?? null,
+        category: (d as any).products?.category ?? null,
       };
     });
 
@@ -168,6 +173,13 @@ export default function KitchenScreen() {
   };
 
   const filtered = items.filter((i) => {
+    // Filtra por categoria da estação se configurado
+    if (
+      kitchenCategories.length > 0 &&
+      i.category &&
+      !kitchenCategories.includes(i.category)
+    )
+      return false;
     if (filter === "active") return ["pending", "preparing"].includes(i.status);
     return i.status === filter;
   });
@@ -218,6 +230,8 @@ export default function KitchenScreen() {
               }}
             >
               Tempo real · ordenado por chegada
+              {kitchenCategories.length > 0 &&
+                ` · ${kitchenCategories.join(", ")}`}
             </p>
           </div>
           {/* Contadores */}
