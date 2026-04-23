@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useWaiter, usePDVOrder } from "../../hooks/usePDV";
+import { useWaiter, usePDVOrder } from "../../hooks/usePdv";
 import {
   fetchSizePricesForProduct,
   ProductSizePrice,
