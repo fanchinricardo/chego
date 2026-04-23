@@ -221,35 +221,39 @@ export default function StoreKitchenScreen() {
                 marginBottom: 14,
               }}
             >
-              Novo acesso da cozinha
+              {editingId ? "Editar categorias" : "Novo acesso da cozinha"}
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <Input
-                label="Nome"
-                placeholder="Ex: Cozinha Principal"
-                value={form.full_name}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, full_name: e.target.value }))
-                }
-              />
-              <Input
-                label="E-mail"
-                placeholder="cozinha@email.com"
-                value={form.email}
-                type="email"
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, email: e.target.value }))
-                }
-              />
-              <Input
-                label="Senha"
-                placeholder="mínimo 6 caracteres"
-                value={form.password}
-                type="password"
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, password: e.target.value }))
-                }
-              />
+              {!editingId && (
+                <>
+                  <Input
+                    label="Nome"
+                    placeholder="Ex: Cozinha Principal"
+                    value={form.full_name}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, full_name: e.target.value }))
+                    }
+                  />
+                  <Input
+                    label="E-mail"
+                    placeholder="cozinha@email.com"
+                    value={form.email}
+                    type="email"
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, email: e.target.value }))
+                    }
+                  />
+                  <Input
+                    label="Senha"
+                    placeholder="mínimo 6 caracteres"
+                    value={form.password}
+                    type="password"
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, password: e.target.value }))
+                    }
+                  />
+                </>
+              )}
               {/* Seleção de categorias */}
               <div>
                 <p
@@ -418,7 +422,8 @@ export default function StoreKitchenScreen() {
         >
           <p style={{ fontSize: 12, color: "#7e22ce", lineHeight: 1.6 }}>
             💡 A cozinha acessa pelo mesmo app com o e-mail e senha cadastrados.
-            Ela verá apenas os pedidos das mesas em tempo real.
+            <br />
+            ⚠️ Ao remover o acesso o funcionário perde o acesso imediatamente.
           </p>
         </div>
       </div>

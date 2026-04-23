@@ -1,6 +1,10 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useWaiter, usePDVOrder } from "../../hooks/usePdv";
+import { useWaiter, usePDVOrder } from "../../hooks/usePDV";
+import {
+  fetchSizePricesForProduct,
+  ProductSizePrice,
+} from "../../hooks/useProductSizes";
 import { useStoreProducts } from "../../hooks/useCustomer";
 import { colors, Spinner, Toast } from "../../components/ui";
 
@@ -24,6 +28,10 @@ export default function WaiterOrderScreen() {
   const [tab, setTab] = useState<"products" | "order">("products");
   const [noteProduct, setNoteProduct] = useState<any | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [noteSizes, setNoteSizes] = useState<ProductSizePrice[]>([]);
+  const [noteSelectedSize, setNoteSelectedSize] =
+    useState<ProductSizePrice | null>(null);
+  const [loadingSizes, setLoadingSizes] = useState(false);
 
   function showToast(msg: string, type: "success" | "error" = "success") {
     setToast(msg);
@@ -40,25 +48,47 @@ export default function WaiterOrderScreen() {
     });
   }, [products, activeCategory, search]);
 
-  function handleAddProduct(product: any) {
+  async function handleAddProduct(product: any) {
     setNoteProduct(product);
     setNoteText("");
+    setNoteSizes([]);
+    setNoteSelectedSize(null);
+    if (product.size_type === "sizes") {
+      setLoadingSizes(true);
+      const sizes = await fetchSizePricesForProduct(product.id);
+      setNoteSizes(sizes);
+      if (sizes.length > 0) setNoteSelectedSize(sizes[0]);
+      setLoadingSizes(false);
+    }
   }
 
   async function confirmAddProduct() {
     if (!order || !noteProduct) return;
+    if (noteProduct.size_type === "sizes" && !noteSelectedSize) {
+      showToast("Selecione um tamanho", "error");
+      return;
+    }
     setAdding(noteProduct.id);
     try {
+      const sizeName = noteSelectedSize?.product_sizes?.name;
+      const sizePrice = noteSelectedSize
+        ? Number(noteSelectedSize.price)
+        : Number(noteProduct.price);
+      const itemName = sizeName
+        ? `${noteProduct.name} (${sizeName})`
+        : noteProduct.name;
       await addItem({
         product_id: noteProduct.id,
-        name: noteProduct.name,
+        name: itemName,
         quantity: 1,
-        unit_price: Number(noteProduct.price),
+        unit_price: sizePrice,
         notes: noteText.trim() || undefined,
       });
-      showToast(`${noteProduct.name} adicionado!`);
+      showToast(`${itemName} adicionado!`);
       setNoteProduct(null);
       setNoteText("");
+      setNoteSizes([]);
+      setNoteSelectedSize(null);
     } catch (e: any) {
       showToast(e.message, "error");
     } finally {
@@ -570,11 +600,63 @@ export default function WaiterOrderScreen() {
                 fontSize: 13,
                 color: colors.rosa,
                 fontWeight: 600,
-                marginBottom: 16,
+                marginBottom: noteProduct.size_type === "sizes" ? 12 : 16,
               }}
             >
-              R$ {Number(noteProduct.price).toFixed(2)}
+              {noteSelectedSize
+                ? `R$ ${Number(noteSelectedSize.price).toFixed(2)}`
+                : noteProduct.price > 0
+                  ? `R$ ${Number(noteProduct.price).toFixed(2)}`
+                  : "Selecione o tamanho"}
             </p>
+            {noteProduct.size_type === "sizes" && (
+              <div style={{ marginBottom: 14 }}>
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#aaa",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    marginBottom: 8,
+                  }}
+                >
+                  Tamanho
+                </p>
+                {loadingSizes ? (
+                  <p style={{ fontSize: 12, color: "#aaa" }}>Carregando...</p>
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {noteSizes.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => setNoteSelectedSize(s)}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: 20,
+                          border: `1.5px solid ${noteSelectedSize?.id === s.id ? colors.rosa : colors.bordaLilas}`,
+                          background:
+                            noteSelectedSize?.id === s.id
+                              ? "#fff0f8"
+                              : "#fafafa",
+                          color:
+                            noteSelectedSize?.id === s.id
+                              ? colors.rosa
+                              : "#888",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        {s.product_sizes?.name} · R${" "}
+                        {Number(s.price).toFixed(2)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <p
               style={{
                 fontSize: 11,
