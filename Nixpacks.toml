@@ -1,5 +1,5 @@
 [phases.build]
-cmds = ["npm install", "npm run build", "npm install -g http-server"]
+cmds = ["npm install", "npm run build"]
 
 [start]
-cmd = "http-server dist -p $PORT --proxy http://localhost:$PORT?"
+cmd = "npm start"
