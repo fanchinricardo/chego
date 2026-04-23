@@ -10,6 +10,8 @@ export interface Product {
   price: number;
   image_url: string | null;
   active: boolean;
+  size_type: string;
+  allows_half: boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;

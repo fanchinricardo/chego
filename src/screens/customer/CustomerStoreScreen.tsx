@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useStoreDetail, useStoreProducts } from "../../hooks/useCustomer";
 import { useCart } from "../../contexts/CartContext";
 import { ProductModal, CartItem } from "../../components/ProductModal";
+import {
+  fetchSizePricesForProduct,
+  ProductSizePrice,
+} from "../../hooks/useProductSizes";
 import { colors, Spinner, Toast } from "../../components/ui";
 
 export default function CustomerStoreScreen() {
@@ -24,6 +28,7 @@ export default function CustomerStoreScreen() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [showDiffStoreModal, setShowDiffStoreModal] = useState(false);
   const [pendingProduct, setPendingProduct] = useState<any | null>(null);
+  const [productSizes, setProductSizes] = useState<Record<string, any[]>>({});
 
   function showToast(msg: string, type: "success" | "error" = "success") {
     setToast(msg);
@@ -402,16 +407,56 @@ export default function CustomerStoreScreen() {
                           {product.description}
                         </p>
                       )}
-                      <p
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: colors.rosa,
-                          marginTop: 4,
-                        }}
-                      >
-                        R$ {Number(product.price).toFixed(2)}
-                      </p>
+                      {product.size_type === "sizes" &&
+                      productSizes[product.id]?.length > 0 ? (
+                        <div style={{ marginTop: 4 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: 4,
+                            }}
+                          >
+                            {productSizes[product.id].map((s) => (
+                              <span
+                                key={s.size_id}
+                                style={{
+                                  fontSize: 10,
+                                  background: colors.lilasClaro,
+                                  color: "#7e22ce",
+                                  borderRadius: 6,
+                                  padding: "2px 7px",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {s.product_sizes?.name} · R${" "}
+                                {Number(s.price).toFixed(2)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : product.size_type === "sizes" ? (
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: colors.rosa,
+                            marginTop: 4,
+                          }}
+                        >
+                          Ver opções →
+                        </p>
+                      ) : (
+                        <p
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: colors.rosa,
+                            marginTop: 4,
+                          }}
+                        >
+                          R$ {Number(product.price).toFixed(2)}
+                        </p>
+                      )}
                     </div>
                     <button
                       onClick={(e) => {

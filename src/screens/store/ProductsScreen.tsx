@@ -4,6 +4,8 @@ import { useProducts, Product, ProductPayload } from "../../hooks/useProducts";
 import {
   useProductSizes,
   useProductSizePrices,
+  fetchSizePricesForProduct,
+  ProductSizePrice,
 } from "../../hooks/useProductSizes";
 import { colors, Input, Button, Spinner, Toast } from "../../components/ui";
 import { BottomNav } from "./StoreDashboard";
@@ -28,13 +30,13 @@ const EMPTY_FORM: ProductPayload & { imageFile?: File; imagePreview?: string } =
     price: 0,
     category: "Geral",
     active: true,
-    allows_half: false,
     size_type: "none",
+    allows_half: false,
   };
 
 export default function ProductsScreen() {
-  const { store } = useStore();
   const navigate = useNavigate();
+  const { store } = useStore();
   const {
     products,
     categories,
@@ -45,6 +47,25 @@ export default function ProductsScreen() {
     toggleActive,
     deleteProduct,
   } = useProducts(store?.id ?? null);
+  const [productSizes, setProductSizes] = useState<
+    Record<string, ProductSizePrice[]>
+  >({});
+
+  useEffect(() => {
+    const prods = products.filter((p) => p.size_type === "sizes");
+    if (prods.length === 0) return;
+    Promise.all(
+      prods.map((p) =>
+        fetchSizePricesForProduct(p.id).then((sizes) => ({ id: p.id, sizes })),
+      ),
+    ).then((results) => {
+      const map: Record<string, ProductSizePrice[]> = {};
+      results.forEach((r) => {
+        map[r.id] = r.sizes;
+      });
+      setProductSizes(map);
+    });
+  }, [products]);
 
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("Todos");
@@ -78,8 +99,8 @@ export default function ProductsScreen() {
       price: p.price,
       category: p.category,
       active: p.active,
-      allows_half: (p as any).allows_half ?? false,
-      size_type: (p as any).size_type ?? "none",
+      allows_half: p.allows_half ?? false,
+      size_type: p.size_type ?? "none",
     });
     setErrors({});
     setShowModal(true);
@@ -95,7 +116,8 @@ export default function ProductsScreen() {
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Informe o nome";
-    if (form.price <= 0) e.price = "Preço deve ser maior que zero";
+    if (form.price <= 0 && form.size_type !== "sizes")
+      e.price = "Informe o preço ou use tamanhos";
     if (!form.category.trim()) e.category = "Escolha uma categoria";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -110,8 +132,8 @@ export default function ProductsScreen() {
         price: Number(form.price),
         category: form.category,
         active: form.active,
-        allows_half: (form as any).allows_half ?? false,
-        size_type: (form as any).size_type ?? "none",
+        allows_half: form.allows_half ?? false,
+        size_type: form.size_type ?? "none",
       };
       if (editing) {
         await updateProduct(editing.id, payload, form.imageFile);
@@ -292,6 +314,7 @@ export default function ProductsScreen() {
         {filtered.map((p) => (
           <div
             key={p.id}
+            onClick={() => openEdit(p)}
             style={{
               background: "#fff",
               borderRadius: 13,
@@ -301,6 +324,7 @@ export default function ProductsScreen() {
               gap: 12,
               padding: "10px 12px",
               opacity: p.active ? 1 : 0.55,
+              cursor: "pointer",
             }}
           >
             {/* Imagem ou emoji */}
@@ -343,26 +367,73 @@ export default function ProductsScreen() {
               >
                 {p.name}
               </p>
-              <p style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>
+              {p.description && (
+                <p
+                  style={{
+                    fontSize: 10,
+                    color: "#aaa",
+                    marginTop: 2,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {p.description}
+                </p>
+              )}
+              <p style={{ fontSize: 9, color: "#ccc", marginTop: 1 }}>
                 {p.category} · {p.active ? "✅ ativo" : "⏸ inativo"}
               </p>
+              {p.size_type === "sizes" && productSizes[p.id]?.length > 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 4,
+                    marginTop: 4,
+                  }}
+                >
+                  {productSizes[p.id].map((s) => (
+                    <span
+                      key={s.size_id}
+                      style={{
+                        fontSize: 10,
+                        background: colors.lilasClaro,
+                        color: "#7e22ce",
+                        borderRadius: 6,
+                        padding: "2px 7px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {s.product_sizes?.name} · R$ {Number(s.price).toFixed(2)}
+                    </span>
+                  ))}
+                </div>
+              ) : p.size_type === "sizes" ? (
+                <p style={{ fontSize: 12, color: colors.rosa, marginTop: 4 }}>
+                  Ver opções →
+                </p>
+              ) : (
+                <p
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: colors.rosa,
+                    marginTop: 4,
+                  }}
+                >
+                  R$ {Number(p.price).toFixed(2)}
+                </p>
+              )}
             </div>
-
-            <p
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: colors.rosa,
-                flexShrink: 0,
-              }}
-            >
-              R${Number(p.price).toFixed(2)}
-            </p>
 
             {/* Ações */}
             <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
               <button
-                onClick={() => toggleActive(p.id, !p.active)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleActive(p.id, !p.active);
+                }}
                 style={{
                   width: 28,
                   height: 28,
@@ -380,7 +451,10 @@ export default function ProductsScreen() {
                 {p.active ? "✅" : "⏸"}
               </button>
               <button
-                onClick={() => openEdit(p)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEdit(p);
+                }}
                 style={{
                   width: 28,
                   height: 28,
@@ -526,7 +600,11 @@ export default function ProductsScreen() {
               <div style={{ display: "flex", gap: 10 }}>
                 <div style={{ flex: 1 }}>
                   <Input
-                    label="Preço (R$)"
+                    label={
+                      form.size_type === "sizes"
+                        ? "Preço base (opcional — use tamanhos)"
+                        : "Preço (R$)"
+                    }
                     type="number"
                     placeholder="0,00"
                     value={form.price || ""}
@@ -535,6 +613,12 @@ export default function ProductsScreen() {
                     }
                     error={errors.price}
                   />
+                  {form.size_type === "sizes" && (
+                    <p style={{ fontSize: 11, color: "#888", marginTop: -8 }}>
+                      💡 O preço será definido em cada tamanho. Deixe 0 para
+                      usar apenas os tamanhos.
+                    </p>
+                  )}
                 </div>
                 <div
                   style={{
@@ -644,32 +728,28 @@ export default function ProductsScreen() {
                     <div
                       key={opt.val}
                       onClick={() =>
-                        setForm((f) => ({ ...f, size_type: opt.val }) as any)
+                        setForm((f) => ({ ...f, size_type: opt.val }))
                       }
                       style={{
                         flex: 1,
                         padding: "8px",
                         borderRadius: 9,
-                        border: `1.5px solid ${(form as any).size_type === opt.val ? colors.rosa : colors.bordaLilas}`,
+                        border: `1.5px solid ${form.size_type === opt.val ? colors.rosa : colors.bordaLilas}`,
                         background:
-                          (form as any).size_type === opt.val
-                            ? "#fff0f8"
-                            : "#fafafa",
+                          form.size_type === opt.val ? "#fff0f8" : "#fafafa",
                         cursor: "pointer",
                         textAlign: "center",
                         fontSize: 12,
                         fontWeight: 600,
                         color:
-                          (form as any).size_type === opt.val
-                            ? colors.rosa
-                            : "#888",
+                          form.size_type === opt.val ? colors.rosa : "#888",
                       }}
                     >
                       {opt.label}
                     </div>
                   ))}
                 </div>
-                {(form as any).size_type === "sizes" && editing && (
+                {form.size_type === "sizes" && editing && (
                   <button
                     onClick={() => {
                       const pid = editing?.id;
@@ -693,7 +773,7 @@ export default function ProductsScreen() {
                     ⚙️ Definir preços por tamanho →
                   </button>
                 )}
-                {(form as any).size_type === "sizes" && !editing && (
+                {form.size_type === "sizes" && !editing && (
                   <p style={{ fontSize: 11, color: "#aaa", marginTop: 6 }}>
                     💡 Salve o produto primeiro para definir preços por tamanho.
                   </p>
@@ -728,18 +808,13 @@ export default function ProductsScreen() {
                 </div>
                 <div
                   onClick={() =>
-                    setForm(
-                      (f) =>
-                        ({ ...f, allows_half: !(f as any).allows_half }) as any,
-                    )
+                    setForm((f) => ({ ...f, allows_half: !f.allows_half }))
                   }
                   style={{
                     width: 40,
                     height: 22,
                     borderRadius: 11,
-                    background: (form as any).allows_half
-                      ? colors.rosa
-                      : "#d1d5db",
+                    background: form.allows_half ? colors.rosa : "#d1d5db",
                     position: "relative",
                     cursor: "pointer",
                     transition: "background 0.2s",
@@ -750,7 +825,7 @@ export default function ProductsScreen() {
                     style={{
                       position: "absolute",
                       top: 3,
-                      left: (form as any).allows_half ? 20 : 3,
+                      left: form.allows_half ? 20 : 3,
                       width: 16,
                       height: 16,
                       borderRadius: "50%",
