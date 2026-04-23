@@ -384,36 +384,7 @@ export default function ProductsScreen() {
               <p style={{ fontSize: 9, color: "#ccc", marginTop: 1 }}>
                 {p.category} · {p.active ? "✅ ativo" : "⏸ inativo"}
               </p>
-              {p.size_type === "sizes" && productSizes[p.id]?.length > 0 ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 4,
-                    marginTop: 4,
-                  }}
-                >
-                  {productSizes[p.id].map((s) => (
-                    <span
-                      key={s.size_id}
-                      style={{
-                        fontSize: 10,
-                        background: colors.lilasClaro,
-                        color: "#7e22ce",
-                        borderRadius: 6,
-                        padding: "2px 7px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {s.product_sizes?.name} · R$ {Number(s.price).toFixed(2)}
-                    </span>
-                  ))}
-                </div>
-              ) : p.size_type === "sizes" ? (
-                <p style={{ fontSize: 12, color: colors.rosa, marginTop: 4 }}>
-                  Ver opções →
-                </p>
-              ) : (
+              {p.size_type !== "sizes" && (
                 <p
                   style={{
                     fontSize: 13,
