@@ -53,7 +53,7 @@ export default function TablePublicScreen() {
 
     const { data: table } = await pub
       .from("pdv_tables")
-      .select("id, number, name, status, pin, stores(name)")
+      .select("id, number, name, status, pin, current_order_id, stores(name)")
       .eq("qr_token", token)
       .maybeSingle();
 
@@ -75,44 +75,40 @@ export default function TablePublicScreen() {
       return;
     }
 
-    // PIN correto — carrega dados
+    // PIN correto — salva order_id e carrega dados
     setTableId(table.id);
     setTableName(table.name ?? `Mesa ${table.number}`);
     setStoreName((table as any).stores?.name ?? "");
-    await loadItems(table.id);
+    await loadItems(table.id, table.current_order_id);
     setStep("view");
     setChecking(false);
   }
 
-  async function loadItems(tid: string) {
+  async function loadItems(tid: string, orderId?: string) {
     setLoading(true);
-    // Busca só o pedido aberto DEPOIS que a mesa foi aberta (evita pedidos antigos)
-    const { data: tableInfo } = await pub
-      .from("pdv_tables")
-      .select("opened_at")
-      .eq("id", tid)
-      .maybeSingle();
 
-    let ordersQuery = pub
-      .from("pdv_orders")
-      .select("id")
-      .eq("table_id", tid)
-      .eq("status", "open")
-      .order("created_at", { ascending: false })
-      .limit(1);
+    let orderIds: string[] = [];
 
-    if (tableInfo?.opened_at) {
-      ordersQuery = ordersQuery.gte("created_at", tableInfo.opened_at);
+    if (orderId) {
+      // Usa o order_id vinculado ao PIN
+      orderIds = [orderId];
+    } else {
+      // Fallback — busca pedido aberto da mesa
+      const { data: orders } = await pub
+        .from("pdv_orders")
+        .select("id")
+        .eq("table_id", tid)
+        .eq("status", "open")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      orderIds = (orders ?? []).map((o: any) => o.id);
     }
 
-    const { data: orders } = await ordersQuery;
-
-    if (!orders || orders.length === 0) {
+    if (orderIds.length === 0) {
       setLoading(false);
       return;
     }
 
-    const orderIds = orders.map((o: any) => o.id);
     const { data: orderItems } = await pub
       .from("pdv_order_items")
       .select("id, name, quantity, unit_price, total_price, notes, status")

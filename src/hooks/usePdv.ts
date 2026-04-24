@@ -97,6 +97,7 @@ export function useWaiter() {
         waiter_id: user.id,
         opened_at: new Date().toISOString(),
         pin,
+        current_order_id: order.id,
       })
       .eq("id", tableId);
     return order;
