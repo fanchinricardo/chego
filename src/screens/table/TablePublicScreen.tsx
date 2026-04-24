@@ -86,11 +86,26 @@ export default function TablePublicScreen() {
 
   async function loadItems(tid: string) {
     setLoading(true);
-    const { data: orders } = await pub
+    // Busca só o pedido aberto DEPOIS que a mesa foi aberta (evita pedidos antigos)
+    const { data: tableInfo } = await pub
+      .from("pdv_tables")
+      .select("opened_at")
+      .eq("id", tid)
+      .maybeSingle();
+
+    let ordersQuery = pub
       .from("pdv_orders")
       .select("id")
       .eq("table_id", tid)
-      .eq("status", "open");
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (tableInfo?.opened_at) {
+      ordersQuery = ordersQuery.gte("created_at", tableInfo.opened_at);
+    }
+
+    const { data: orders } = await ordersQuery;
 
     if (!orders || orders.length === 0) {
       setLoading(false);
