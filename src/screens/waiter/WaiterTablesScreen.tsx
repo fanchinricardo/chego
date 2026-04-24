@@ -46,22 +46,26 @@ export default function WaiterTablesScreen() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [opening, setOpening] = useState<string | null>(null);
   const [readyTables, setReadyTables] = useState<Set<string>>(new Set());
+  const [calls, setCalls] = useState<
+    { id: string; table_id: string; created_at: string }[]
+  >([]);
   const [calledTables, setCalledTables] = useState<Set<string>>(new Set());
   const [pulseBlink, setPulseBlink] = useState(false);
 
   // Busca chamadas de garçom não respondidas
   const fetchCalls = useCallback(async () => {
     if (!storeId) return;
+    const tableIds =
+      (
+        await supabase.from("pdv_tables").select("id").eq("store_id", storeId)
+      ).data?.map((t: any) => t.id) ?? [];
     const { data } = await supabase
       .from("pdv_table_calls")
-      .select("table_id")
+      .select("id, table_id, created_at")
       .eq("answered", false)
-      .in(
-        "table_id",
-        (
-          await supabase.from("pdv_tables").select("id").eq("store_id", storeId)
-        ).data?.map((t: any) => t.id) ?? [],
-      );
+      .in("table_id", tableIds)
+      .order("created_at", { ascending: true });
+    setCalls((data ?? []) as any[]);
     setCalledTables(new Set((data ?? []).map((c: any) => c.table_id)));
   }, [storeId]);
 
@@ -114,6 +118,20 @@ export default function WaiterTablesScreen() {
     setToast(msg);
     setToastType(type);
     setTimeout(() => setToast(""), 3000);
+  }
+
+  async function dismissCall(e: React.MouseEvent, tableId: string) {
+    e.stopPropagation();
+    await supabase
+      .from("pdv_table_calls")
+      .update({ answered: true })
+      .eq("table_id", tableId)
+      .eq("answered", false);
+    setCalledTables((prev) => {
+      const n = new Set(prev);
+      n.delete(tableId);
+      return n;
+    });
   }
 
   async function handleTablePress(table: PDVTable) {
@@ -253,6 +271,121 @@ export default function WaiterTablesScreen() {
         </div>
       </div>
 
+      {/* Painel de chamadas */}
+      {calls.length > 0 && (
+        <div
+          style={{ maxWidth: 520, margin: "0 auto", padding: "12px 16px 0" }}
+        >
+          <div
+            style={{
+              background: "#fff0f0",
+              border: "2px solid #ef4444",
+              borderRadius: 14,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "8px 14px",
+                background: "#ef4444",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <p style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>
+                🛎️ Chamadas pendentes — {calls.length}
+              </p>
+            </div>
+            {calls.map((call, idx) => {
+              const table = tables.find((t) => t.id === call.table_id);
+              if (!table) return null;
+              const diff = Math.floor(
+                (Date.now() - new Date(call.created_at).getTime()) / 1000,
+              );
+              const ago =
+                diff < 60 ? `${diff}s` : `${Math.floor(diff / 60)}min`;
+              return (
+                <div
+                  key={call.id}
+                  style={{
+                    padding: "8px 14px",
+                    borderBottom:
+                      idx < calls.length - 1 ? "1px solid #fecaca" : "none",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: "50%",
+                      background: "#ef4444",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <p style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>
+                      {idx + 1}
+                    </p>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: "#dc2626",
+                      }}
+                    >
+                      {table.name ?? `Mesa ${table.number}`}
+                    </p>
+                    <p style={{ fontSize: 10, color: "#aaa" }}>há {ago}</p>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      onClick={() => navigate(`/waiter/table/${table.id}`)}
+                      style={{
+                        padding: "5px 10px",
+                        borderRadius: 8,
+                        background: "#ef4444",
+                        border: "none",
+                        color: "#fff",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      Ir →
+                    </button>
+                    <button
+                      onClick={(e) => dismissCall(e, table.id)}
+                      style={{
+                        padding: "5px 10px",
+                        borderRadius: 8,
+                        background: "#fff",
+                        border: "1px solid #ef4444",
+                        color: "#ef4444",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      ✓ OK
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Grid de mesas */}
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "16px" }}>
         {loading ? (
@@ -307,19 +440,47 @@ export default function WaiterTablesScreen() {
                   {calledTables.has(table.id) && (
                     <div
                       style={{
-                        background: pulseBlink ? "#ef4444" : "#dc2626",
-                        borderRadius: 6,
-                        padding: "2px 6px",
                         marginBottom: 4,
-                        display: "inline-block",
-                        transition: "background 0.3s",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 3,
                       }}
                     >
-                      <p
-                        style={{ fontSize: 9, fontWeight: 700, color: "#fff" }}
+                      <div
+                        style={{
+                          background: pulseBlink ? "#ef4444" : "#dc2626",
+                          borderRadius: 6,
+                          padding: "2px 8px",
+                          transition: "background 0.3s",
+                        }}
                       >
-                        🛎️ CHAMANDO!
-                      </p>
+                        <p
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            color: "#fff",
+                          }}
+                        >
+                          🛎️ CHAMANDO!
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => dismissCall(e, table.id)}
+                        style={{
+                          background: "#fff",
+                          border: "1px solid #ef4444",
+                          borderRadius: 6,
+                          padding: "2px 8px",
+                          color: "#ef4444",
+                          fontSize: 8,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                      >
+                        ✓ OK
+                      </button>
                     </div>
                   )}
                   {readyTables.has(table.id) && (
