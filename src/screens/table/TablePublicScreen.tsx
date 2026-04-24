@@ -66,7 +66,6 @@ export default function TablePublicScreen() {
         .from("pdv_order_items")
         .select("id, name, quantity, unit_price, total_price, notes, status")
         .eq("order_id", order.id)
-        .neq("status", "served")
         .order("created_at", { ascending: true });
       setItems((orderItems ?? []) as OrderItem[]);
     }
