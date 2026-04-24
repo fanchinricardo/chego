@@ -13,7 +13,7 @@ export default function WaiterOrderScreen() {
   const { tableId } = useParams<{ tableId: string }>();
   const navigate = useNavigate();
 
-  const { tables, requestBill } = useWaiter();
+  const { tables, requestBill, storeId } = useWaiter();
   const table = tables.find((t) => t.id === tableId);
 
   const { order, loading, addItem, removeItem, updateItemQty, refetch } =
@@ -616,9 +616,7 @@ export default function WaiterOrderScreen() {
                       fontSize: 22,
                       color: colors.rosa,
                     }}
-                  >
-                    R$ {orderTotal.toFixed(2)}
-                  </p>
+                  ></p>
                 </div>
 
                 <button
