@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { colors, Spinner } from "../../components/ui";
+import { notify } from "../../services/whatsapp";
 
 interface KitchenItem {
   id: string;
@@ -10,11 +11,16 @@ interface KitchenItem {
   notes: string | null;
   status: "pending" | "preparing" | "ready" | "served";
   created_at: string;
-  order_id: string;
-  table_number: number | null;
-  table_name: string | null;
-  waiter_name: string | null;
   category: string | null;
+}
+
+interface KitchenGroup {
+  order_id: string;
+  table_label: string;
+  waiter_name: string | null;
+  source: "pdv" | "delivery";
+  created_at: string;
+  items: KitchenItem[];
 }
 
 const STATUS_CFG = {
@@ -63,67 +69,115 @@ const FILTERS = [
   { key: "ready", label: "Prontos" },
 ];
 
+function groupStatus(
+  items: KitchenItem[],
+): "pending" | "preparing" | "ready" | "served" {
+  if (items.some((i) => i.status === "pending")) return "pending";
+  if (items.some((i) => i.status === "preparing")) return "preparing";
+  if (items.some((i) => i.status === "ready")) return "ready";
+  return "served";
+}
+
 export default function KitchenScreen() {
   const { profile, signOut } = useAuth();
-  const kitchenCategories: string[] = profile?.kitchen_categories ?? [];
   const storeId = profile?.store_id ?? null;
+  const kitchenCategories: string[] = profile?.kitchen_categories ?? [];
 
-  const [items, setItems] = useState<KitchenItem[]>([]);
+  const [groups, setGroups] = useState<KitchenGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("active");
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [readyTables, setReadyTables] = useState<Set<string>>(new Set());
 
   const fetchItems = useCallback(async () => {
     if (!storeId) return;
 
-    // 1. Busca os order_ids da loja com pedidos abertos
-    const { data: orders } = await supabase
+    // ── PDV ──────────────────────────────────────────────
+    const { data: pdvOrders } = await supabase
       .from("pdv_orders")
-      .select("id, pdv_tables(number, name), profiles(full_name)")
+      .select("id, created_at, pdv_tables(number, name), profiles(full_name)")
       .eq("store_id", storeId)
       .eq("status", "open");
 
-    if (!orders || orders.length === 0) {
-      setItems([]);
-      setLoading(false);
-      return;
+    const pdvOrderIds = (pdvOrders ?? []).map((o: any) => o.id);
+    const pdvOrderMap: Record<string, any> = {};
+    (pdvOrders ?? []).forEach((o: any) => {
+      pdvOrderMap[o.id] = o;
+    });
+
+    let pdvData: any[] = [];
+    if (pdvOrderIds.length > 0) {
+      const { data } = await supabase
+        .from("pdv_order_items")
+        .select(
+          "id, name, quantity, notes, status, created_at, order_id, product_id, products(category)",
+        )
+        .in("order_id", pdvOrderIds)
+        .in("status", ["pending", "preparing", "ready"])
+        .order("created_at", { ascending: true });
+      pdvData = data ?? [];
     }
 
-    const orderIds = orders.map((o: any) => o.id);
+    const pdvGroups: KitchenGroup[] = [];
+    for (const order of pdvOrders ?? []) {
+      const orderItems = pdvData
+        .filter((d: any) => d.order_id === order.id)
+        .map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          quantity: d.quantity,
+          notes: d.notes,
+          status: d.status,
+          created_at: d.created_at,
+          category: d.products?.category ?? null,
+        }));
+      if (orderItems.length === 0) continue;
+      pdvGroups.push({
+        order_id: order.id,
+        table_label:
+          order.pdv_tables?.name ?? `Mesa ${order.pdv_tables?.number ?? "?"}`,
+        waiter_name: order.profiles?.full_name ?? null,
+        source: "pdv",
+        created_at: order.created_at,
+        items: orderItems,
+      });
+    }
 
-    // 2. Busca os itens desses pedidos
-    const { data } = await supabase
-      .from("pdv_order_items")
+    // ── Delivery ─────────────────────────────────────────
+    const { data: deliveryOrders } = await supabase
+      .from("orders")
       .select(
-        "id, name, quantity, notes, status, created_at, order_id, product_id, products(category)",
+        "id, created_at, status, profiles(full_name), order_items(id, quantity, notes, custom_name, products(name, category))",
       )
-      .in("order_id", orderIds)
-      .in("status", ["pending", "preparing", "ready"])
+      .eq("store_id", storeId)
+      .in("status", ["confirmed", "preparing"])
       .order("created_at", { ascending: true });
 
-    const orderMap: Record<string, any> = {};
-    orders.forEach((o: any) => {
-      orderMap[o.id] = o;
-    });
+    const deliveryGroups: KitchenGroup[] = (deliveryOrders ?? [])
+      .map((order: any) => ({
+        order_id: order.id,
+        table_label: `🛵 ${order.profiles?.full_name ?? "Delivery"}`,
+        waiter_name: null,
+        source: "delivery" as const,
+        created_at: order.created_at,
+        items: (order.order_items ?? []).map((item: any) => ({
+          id: item.id,
+          name: item.custom_name ?? item.products?.name ?? "Item",
+          quantity: item.quantity,
+          notes: item.notes,
+          status: order.status === "confirmed" ? "pending" : "preparing",
+          created_at: order.created_at,
+          category: item.products?.category ?? null,
+        })),
+      }))
+      .filter((g) => g.items.length > 0);
 
-    const mapped: KitchenItem[] = (data ?? []).map((d: any) => {
-      const order = orderMap[d.order_id];
-      return {
-        id: d.id,
-        name: d.name,
-        quantity: d.quantity,
-        notes: d.notes,
-        status: d.status,
-        created_at: d.created_at,
-        order_id: d.order_id,
-        table_number: order?.pdv_tables?.number ?? null,
-        table_name: order?.pdv_tables?.name ?? null,
-        waiter_name: order?.profiles?.full_name ?? null,
-        category: (d as any).products?.category ?? null,
-      };
-    });
-
-    setItems(mapped);
+    const all = [...pdvGroups, ...deliveryGroups].sort(
+      (a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    );
+    setGroups(all);
     setLoading(false);
   }, [storeId]);
 
@@ -137,18 +191,86 @@ export default function KitchenScreen() {
         { event: "*", schema: "public", table: "pdv_order_items" },
         fetchItems,
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "order_items" },
+        fetchItems,
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders" },
+        fetchItems,
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
   }, [fetchItems, storeId]);
 
-  async function updateStatus(id: string, next: string) {
-    setUpdating(id);
-    await supabase
-      .from("pdv_order_items")
-      .update({ status: next })
-      .eq("id", id);
+  async function updateItemStatus(
+    item: KitchenItem,
+    next: string,
+    source: "pdv" | "delivery",
+    orderId: string,
+  ) {
+    setUpdating(item.id);
+    if (source === "pdv") {
+      await supabase
+        .from("pdv_order_items")
+        .update({ status: next })
+        .eq("id", item.id);
+      // Verifica se todos os itens do grupo ficaram prontos
+      if (next === "ready") {
+        const group = groups.find((g) => g.order_id === orderId);
+        if (group) {
+          const otherItems = group.items.filter((i) => i.id !== item.id);
+          const allReady = otherItems.every(
+            (i) => i.status === "ready" || i.status === "served",
+          );
+          if (allReady) {
+            setReadyTables((prev) => new Set([...prev, orderId]));
+          }
+        }
+      }
+    } else {
+      const newOrderStatus = next === "ready" ? "ready" : "preparing";
+      await supabase
+        .from("orders")
+        .update({ status: newOrderStatus })
+        .eq("id", orderId);
+      if (next === "ready") notify.orderReady(orderId);
+    }
+    await fetchItems();
+    setUpdating(null);
+  }
+
+  async function updateAllInGroup(group: KitchenGroup, next: string) {
+    setUpdating(group.order_id);
+    if (group.source === "pdv") {
+      const pendingIds = group.items
+        .filter((i) => i.status !== "served" && i.status !== next)
+        .map((i) => i.id);
+      for (const id of pendingIds) {
+        await supabase
+          .from("pdv_order_items")
+          .update({ status: next })
+          .eq("id", id);
+      }
+      // Pisca a mesa quando pronto
+      if (next === "ready") {
+        setReadyTables((prev) => new Set([...prev, group.order_id]));
+      }
+    } else {
+      const newOrderStatus = next === "ready" ? "ready" : "preparing";
+      await supabase
+        .from("orders")
+        .update({ status: newOrderStatus })
+        .eq("id", group.order_id);
+      // Envia WhatsApp quando pedido delivery fica pronto
+      if (next === "ready") {
+        notify.orderReady(group.order_id);
+      }
+    }
     await fetchItems();
     setUpdating(null);
   }
@@ -164,25 +286,28 @@ export default function KitchenScreen() {
     return Date.now() - new Date(d).getTime() > 10 * 60 * 1000;
   }
 
-  const counts = {
-    active: items.filter((i) => ["pending", "preparing"].includes(i.status))
-      .length,
-    pending: items.filter((i) => i.status === "pending").length,
-    preparing: items.filter((i) => i.status === "preparing").length,
-    ready: items.filter((i) => i.status === "ready").length,
-  };
-
-  const filtered = items.filter((i) => {
-    // Filtra por categoria da estação se configurado
-    if (
-      kitchenCategories.length > 0 &&
-      i.category &&
-      !kitchenCategories.includes(i.category)
-    )
-      return false;
-    if (filter === "active") return ["pending", "preparing"].includes(i.status);
-    return i.status === filter;
+  const filteredGroups = groups.filter((g) => {
+    const visibleItems =
+      kitchenCategories.length > 0
+        ? g.items.filter(
+            (i) => !i.category || kitchenCategories.includes(i.category),
+          )
+        : g.items;
+    if (visibleItems.length === 0) return false;
+    const status = groupStatus(visibleItems);
+    if (filter === "active") return ["pending", "preparing"].includes(status);
+    return status === filter;
   });
+
+  const counts = {
+    active: groups.filter((g) =>
+      ["pending", "preparing"].includes(groupStatus(g.items)),
+    ).length,
+    pending: groups.filter((g) => groupStatus(g.items) === "pending").length,
+    preparing: groups.filter((g) => groupStatus(g.items) === "preparing")
+      .length,
+    ready: groups.filter((g) => groupStatus(g.items) === "ready").length,
+  };
 
   return (
     <div
@@ -234,8 +359,7 @@ export default function KitchenScreen() {
                 ` · ${kitchenCategories.join(", ")}`}
             </p>
           </div>
-          {/* Contadores */}
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {[
               { label: "Aguardando", count: counts.pending, color: "#f59e0b" },
               {
@@ -276,27 +400,24 @@ export default function KitchenScreen() {
                 </p>
               </div>
             ))}
+            <button
+              onClick={signOut}
+              style={{
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: 10,
+                padding: "8px 16px",
+                color: "rgba(255,255,255,0.6)",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              Sair
+            </button>
           </div>
-          <button
-            onClick={signOut}
-            style={{
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.15)",
-              borderRadius: 10,
-              padding: "8px 16px",
-              color: "rgba(255,255,255,0.6)",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "'Space Grotesk', sans-serif",
-              alignSelf: "flex-start",
-            }}
-          >
-            Sair
-          </button>
         </div>
-
-        {/* Filtros */}
         <div
           style={{
             maxWidth: 1100,
@@ -330,13 +451,13 @@ export default function KitchenScreen() {
         </div>
       </div>
 
-      {/* Cards */}
+      {/* Cards agrupados */}
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "16px" }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: 48 }}>
             <Spinner color={colors.rosa} />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : filteredGroups.length === 0 ? (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <p style={{ fontSize: 40, marginBottom: 12 }}>🍳</p>
             <p
@@ -347,210 +468,432 @@ export default function KitchenScreen() {
               }}
             >
               {filter === "active"
-                ? "Nenhum item para preparar"
-                : "Nenhum item aqui"}
+                ? "Nenhum pedido para preparar"
+                : "Nenhum pedido aqui"}
             </p>
           </div>
         ) : (
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
               gap: 12,
             }}
           >
-            {filtered.map((item) => {
-              const cfg = STATUS_CFG[item.status];
-              const urgent =
-                isUrgent(item.created_at) && item.status === "pending";
-              const isUpd = updating === item.id;
-              const table =
-                item.table_name ??
-                (item.table_number ? `Mesa ${item.table_number}` : "—");
+            {filteredGroups.map((group) => {
+              const visibleItems =
+                kitchenCategories.length > 0
+                  ? group.items.filter(
+                      (i) =>
+                        !i.category || kitchenCategories.includes(i.category),
+                    )
+                  : group.items;
+              const status = groupStatus(visibleItems);
+              const cfg = STATUS_CFG[status];
+              const urgent = isUrgent(group.created_at) && status === "pending";
+              const isOpen = expanded === group.order_id;
+              const isUpd = updating === group.order_id;
+
+              const pendingCount = visibleItems.filter(
+                (i) => i.status === "pending",
+              ).length;
+              const preparingCount = visibleItems.filter(
+                (i) => i.status === "preparing",
+              ).length;
+              const readyCount = visibleItems.filter(
+                (i) => i.status === "ready",
+              ).length;
 
               return (
                 <div
-                  key={item.id}
+                  key={group.order_id}
                   style={{
                     background: cfg.bg,
-                    border: `2px solid ${urgent ? "#ef4444" : cfg.border}`,
+                    border: `2px solid ${readyTables.has(group.order_id) ? "#22c55e" : urgent ? "#ef4444" : cfg.border}`,
                     borderRadius: 16,
-                    padding: "14px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
+                    overflow: "hidden",
                   }}
                 >
-                  {/* Urgente */}
-                  {urgent && (
-                    <div
-                      style={{
-                        background: "#ef4444",
-                        borderRadius: 6,
-                        padding: "3px 8px",
-                        alignSelf: "flex-start",
-                      }}
-                    >
-                      <p
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          color: "#fff",
-                          letterSpacing: "0.05em",
-                        }}
-                      >
-                        ⚠️ ATRASADO
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Mesa + tempo */}
+                  {/* Header do card — clicável para expandir */}
                   <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
+                    onClick={() => setExpanded(isOpen ? null : group.order_id)}
+                    style={{ padding: "12px 14px", cursor: "pointer" }}
                   >
-                    <div
-                      style={{
-                        background: urgent ? "#ef4444" : cfg.dot,
-                        borderRadius: 8,
-                        padding: "3px 10px",
-                      }}
-                    >
-                      <p
-                        style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}
-                      >
-                        {table}
-                      </p>
-                    </div>
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 4 }}
-                    >
+                    {urgent && (
                       <div
                         style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: "50%",
-                          background: urgent ? "#ef4444" : cfg.dot,
-                        }}
-                      />
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: urgent ? "#ef4444" : cfg.text,
+                          background: "#ef4444",
+                          borderRadius: 6,
+                          padding: "2px 8px",
+                          display: "inline-block",
+                          marginBottom: 6,
                         }}
                       >
-                        {timeAgo(item.created_at)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Nome + qtd */}
-                  <div>
-                    <p
-                      style={{
-                        fontSize: 20,
-                        fontWeight: 700,
-                        color: cfg.text,
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      {item.quantity}× {item.name}
-                    </p>
-                    {item.waiter_name && (
-                      <p
-                        style={{
-                          fontSize: 10,
-                          color: cfg.text,
-                          opacity: 0.6,
-                          marginTop: 2,
-                        }}
-                      >
-                        🧑‍🍳 {item.waiter_name.split(" ")[0]}
-                      </p>
+                        <p
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            color: "#fff",
+                          }}
+                        >
+                          ⚠️ ATRASADO
+                        </p>
+                      </div>
                     )}
-                  </div>
 
-                  {/* Observação */}
-                  {item.notes && (
+                    {/* Mesa + tempo */}
                     <div
                       style={{
-                        background: "rgba(0,0,0,0.06)",
-                        borderRadius: 8,
-                        padding: "7px 10px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginBottom: 8,
                       }}
-                    >
-                      <p
-                        style={{
-                          fontSize: 12,
-                          color: cfg.text,
-                          fontStyle: "italic",
-                        }}
-                      >
-                        📝 {item.notes}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Status + botão */}
-                  <div
-                    style={{
-                      marginTop: "auto",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 6,
-                    }}
-                  >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 4 }}
                     >
                       <div
                         style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: "50%",
-                          background: cfg.dot,
-                        }}
-                      />
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          color: cfg.text,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
                         }}
                       >
-                        {cfg.label}
-                      </span>
-                    </div>
-                    {cfg.next && (
-                      <button
-                        onClick={() => updateStatus(item.id, cfg.next!)}
-                        disabled={isUpd}
-                        style={{
-                          padding: "10px",
-                          borderRadius: 10,
-                          border: "none",
-                          fontSize: 13,
-                          fontWeight: 700,
-                          cursor: isUpd ? "wait" : "pointer",
-                          opacity: isUpd ? 0.7 : 1,
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          color: "#fff",
-                          background:
-                            cfg.next === "ready"
+                        <div
+                          style={{
+                            background: readyTables.has(group.order_id)
                               ? "#22c55e"
-                              : cfg.next === "preparing"
-                                ? colors.rosa
-                                : "#888",
+                              : urgent
+                                ? "#ef4444"
+                                : group.source === "delivery"
+                                  ? "#3b82f6"
+                                  : cfg.dot,
+                            borderRadius: 8,
+                            padding: "3px 10px",
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: "#fff",
+                            }}
+                          >
+                            {group.table_label}
+                          </p>
+                        </div>
+                        {readyTables.has(group.order_id) && (
+                          <div
+                            style={{
+                              background: "#22c55e",
+                              borderRadius: 6,
+                              padding: "2px 8px",
+                            }}
+                          >
+                            <p
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: "#fff",
+                              }}
+                            >
+                              🔔 PRONTO!
+                            </p>
+                          </div>
+                        )}
+                        {group.source === "delivery" && (
+                          <div
+                            style={{
+                              background: "#1d4ed8",
+                              borderRadius: 6,
+                              padding: "2px 6px",
+                            }}
+                          >
+                            <p
+                              style={{
+                                fontSize: 9,
+                                fontWeight: 700,
+                                color: "#fff",
+                              }}
+                            >
+                              DELIVERY
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
                         }}
                       >
-                        {isUpd ? "..." : cfg.nextLabel}
-                      </button>
-                    )}
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: urgent ? "#ef4444" : cfg.text,
+                          }}
+                        >
+                          {timeAgo(group.created_at)}
+                        </span>
+                        <span style={{ fontSize: 14, color: cfg.text }}>
+                          {isOpen ? "▲" : "▼"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Resumo dos itens */}
+                    <div style={{ marginBottom: 8 }}>
+                      {visibleItems.slice(0, isOpen ? 999 : 2).map((item) => (
+                        <p
+                          key={item.id}
+                          style={{
+                            fontSize: 13,
+                            color: cfg.text,
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {item.quantity}× {item.name}
+                          {item.notes && (
+                            <span style={{ fontSize: 11, opacity: 0.6 }}>
+                              {" "}
+                              · {item.notes}
+                            </span>
+                          )}
+                        </p>
+                      ))}
+                      {!isOpen && visibleItems.length > 2 && (
+                        <p
+                          style={{
+                            fontSize: 11,
+                            color: cfg.text,
+                            opacity: 0.6,
+                          }}
+                        >
+                          +{visibleItems.length - 2} mais...
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Contadores de status */}
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {pendingCount > 0 && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            background: "#fff8e6",
+                            border: "1px solid #fcd34d",
+                            borderRadius: 6,
+                            padding: "2px 7px",
+                            color: "#b45309",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {pendingCount} aguardando
+                        </span>
+                      )}
+                      {preparingCount > 0 && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            background: "#fff0f8",
+                            border: `1px solid ${colors.rosa}`,
+                            borderRadius: 6,
+                            padding: "2px 7px",
+                            color: colors.rosa,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {preparingCount} preparando
+                        </span>
+                      )}
+                      {readyCount > 0 && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            background: "#f0fdf4",
+                            border: "1px solid #86efac",
+                            borderRadius: 6,
+                            padding: "2px 7px",
+                            color: "#15803d",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {readyCount} pronto
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Itens expandidos */}
+                  {isOpen && (
+                    <div
+                      style={{
+                        borderTop: `1px solid ${cfg.border}`,
+                        background: "rgba(0,0,0,0.04)",
+                      }}
+                    >
+                      {visibleItems.map((item) => {
+                        const iCfg = STATUS_CFG[item.status];
+                        const iIsUpd = updating === item.id;
+                        return (
+                          <div
+                            key={item.id}
+                            style={{
+                              padding: "10px 14px",
+                              borderBottom: `1px solid ${cfg.border}`,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                            }}
+                          >
+                            <div style={{ flex: 1 }}>
+                              <p
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  color: iCfg.text,
+                                }}
+                              >
+                                {item.quantity}× {item.name}
+                              </p>
+                              {item.notes && (
+                                <p
+                                  style={{
+                                    fontSize: 11,
+                                    color: iCfg.text,
+                                    opacity: 0.7,
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  📝 {item.notes}
+                                </p>
+                              )}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  marginTop: 3,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: 5,
+                                    height: 5,
+                                    borderRadius: "50%",
+                                    background: iCfg.dot,
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    fontSize: 9,
+                                    fontWeight: 600,
+                                    color: iCfg.text,
+                                  }}
+                                >
+                                  {iCfg.label}
+                                </span>
+                              </div>
+                            </div>
+                            {iCfg.next && group.source === "pdv" && (
+                              <button
+                                onClick={() =>
+                                  updateItemStatus(
+                                    item,
+                                    iCfg.next!,
+                                    group.source,
+                                    group.order_id,
+                                  )
+                                }
+                                disabled={iIsUpd}
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: 8,
+                                  border: "none",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: iIsUpd ? "wait" : "pointer",
+                                  color: "#fff",
+                                  fontFamily: "'Space Grotesk', sans-serif",
+                                  background:
+                                    iCfg.next === "ready"
+                                      ? "#22c55e"
+                                      : iCfg.next === "preparing"
+                                        ? colors.rosa
+                                        : "#888",
+                                }}
+                              >
+                                {iIsUpd ? "..." : iCfg.nextLabel}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Botão avançar todos */}
+                      {cfg.next && (
+                        <div
+                          style={{
+                            padding: "10px 14px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                          }}
+                        >
+                          <button
+                            onClick={() => updateAllInGroup(group, cfg.next!)}
+                            disabled={isUpd}
+                            style={{
+                              width: "100%",
+                              padding: "10px",
+                              borderRadius: 10,
+                              border: "none",
+                              fontSize: 13,
+                              fontWeight: 700,
+                              cursor: isUpd ? "wait" : "pointer",
+                              color: "#fff",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                              background:
+                                cfg.next === "ready"
+                                  ? "#22c55e"
+                                  : cfg.next === "preparing"
+                                    ? colors.rosa
+                                    : "#888",
+                            }}
+                          >
+                            {isUpd
+                              ? "..."
+                              : `${cfg.nextLabel} — todos os itens`}
+                          </button>
+                          {readyTables.has(group.order_id) && (
+                            <button
+                              onClick={() =>
+                                setReadyTables((prev) => {
+                                  const n = new Set(prev);
+                                  n.delete(group.order_id);
+                                  return n;
+                                })
+                              }
+                              style={{
+                                width: "100%",
+                                padding: "10px",
+                                borderRadius: 10,
+                                border: "2px solid #22c55e",
+                                background: "#f0fdf4",
+                                fontSize: 13,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                color: "#15803d",
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              ✓ Garçom notificado — confirmar retirada
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

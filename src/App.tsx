@@ -31,6 +31,7 @@ import ProductSizePricesScreen from "./screens/store/ProductSizePricesScreen";
 import StoreTablesScreen from "./screens/store/StoreTablesScreen";
 import StoreWaiterScreen from "./screens/store/StoreWaiterScreen";
 import StoreKitchenScreen from "./screens/store/StoreKitchenScreen";
+import TablePublicScreen from "./screens/table/TablePublicScreen";
 import KitchenScreen from "./screens/kitchen/KitchenScreen";
 import WaiterBillScreen from "./screens/waiter/WaiterBillScreen";
 import WaiterTablesScreen from "./screens/waiter/WaiterTablesScreen";
@@ -38,7 +39,7 @@ import WaiterOrderScreen from "./screens/waiter/WaiterOrderScreen";
 import StoreBillingScreen from "./screens/store/StoreBillingScreen";
 import RouteBuilderScreen from "./screens/store/RouteBuilderScreen";
 import RouteConfirmScreen from "./screens/store/RouteConfirmScreen";
-import RouteScreen, { RouteLiveScreen } from "./screens/store/RouteScreen";
+import RouteScreen,{ RouteLiveScreen } from "./screens/store/RouteScreen";
 
 // Cliente
 import CustomerHomeScreen from "./screens/customer/CustomerHomeScreen";
@@ -353,6 +354,7 @@ export default function App() {
               }
             />
             {/* Garçom */}
+            <Route path="/mesa/:token" element={<TablePublicScreen />} />
             <Route
               path="/kitchen"
               element={

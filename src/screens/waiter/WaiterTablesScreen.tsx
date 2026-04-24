@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
-import { useWaiter, PDVTable } from "../../hooks/usePdv";
+import { useWaiter, PDVTable } from "../../hooks/usePDV";
 import { colors, Spinner, Toast } from "../../components/ui";
 
 const STATUS_CONFIG = {
@@ -39,11 +40,75 @@ const STATUS_CONFIG = {
 export default function WaiterTablesScreen() {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
-  const { tables, loading, openTable } = useWaiter();
+  const { tables, loading, openTable, storeId } = useWaiter();
 
   const [toast, setToast] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [opening, setOpening] = useState<string | null>(null);
+  const [readyTables, setReadyTables] = useState<Set<string>>(new Set());
+  const [calledTables, setCalledTables] = useState<Set<string>>(new Set());
+  const [pulseBlink, setPulseBlink] = useState(false);
+
+  // Busca chamadas de garçom não respondidas
+  const fetchCalls = useCallback(async () => {
+    if (!storeId) return;
+    const { data } = await supabase
+      .from("pdv_table_calls")
+      .select("table_id")
+      .eq("answered", false)
+      .in(
+        "table_id",
+        (
+          await supabase.from("pdv_tables").select("id").eq("store_id", storeId)
+        ).data?.map((t: any) => t.id) ?? [],
+      );
+    setCalledTables(new Set((data ?? []).map((c: any) => c.table_id)));
+  }, [storeId]);
+
+  // Busca mesas com itens prontos na cozinha
+  const fetchReadyTables = useCallback(async () => {
+    if (!storeId) return;
+    const { data } = await supabase
+      .from("pdv_order_items")
+      .select("order_id, pdv_orders(table_id)")
+      .eq("status", "ready");
+    const tableIds = new Set<string>(
+      (data ?? []).map((d: any) => d.pdv_orders?.table_id).filter(Boolean),
+    );
+    setReadyTables(tableIds);
+  }, [storeId]);
+
+  useEffect(() => {
+    fetchReadyTables();
+    fetchCalls();
+    if (!storeId) return;
+    const ch = supabase
+      .channel(`waiter-ready-${storeId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "pdv_order_items" },
+        fetchReadyTables,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "pdv_table_calls" },
+        fetchCalls,
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [fetchReadyTables, fetchCalls, storeId]);
+
+  // Piscar quando há mesas prontas ou chamadas
+  useEffect(() => {
+    if (readyTables.size === 0 && calledTables.size === 0) {
+      setPulseBlink(false);
+      return;
+    }
+    const t = setInterval(() => setPulseBlink((b) => !b), 600);
+    return () => clearInterval(t);
+  }, [readyTables.size, calledTables.size]);
 
   function showToast(msg: string, type: "success" | "error" = "success") {
     setToast(msg);
@@ -220,8 +285,13 @@ export default function WaiterTablesScreen() {
                   key={table.id}
                   onClick={() => !isOpening && handleTablePress(table)}
                   style={{
-                    background: cfg.bg,
-                    border: `2px solid ${cfg.border}`,
+                    background:
+                      calledTables.has(table.id) && pulseBlink
+                        ? "#fff0f0"
+                        : readyTables.has(table.id) && pulseBlink
+                          ? "#f0fdf4"
+                          : cfg.bg,
+                    border: `2px solid ${calledTables.has(table.id) ? (pulseBlink ? "#ef4444" : "#fca5a5") : readyTables.has(table.id) ? (pulseBlink ? "#22c55e" : "#86efac") : cfg.border}`,
                     borderRadius: 16,
                     padding: "16px 10px",
                     textAlign: "center",
@@ -231,13 +301,53 @@ export default function WaiterTablesScreen() {
                         ? "default"
                         : "pointer",
                     opacity: table.status === "closed" ? 0.5 : 1,
+                    transition: "border-color 0.3s, background 0.3s",
                   }}
                 >
+                  {calledTables.has(table.id) && (
+                    <div
+                      style={{
+                        background: pulseBlink ? "#ef4444" : "#dc2626",
+                        borderRadius: 6,
+                        padding: "2px 6px",
+                        marginBottom: 4,
+                        display: "inline-block",
+                        transition: "background 0.3s",
+                      }}
+                    >
+                      <p
+                        style={{ fontSize: 9, fontWeight: 700, color: "#fff" }}
+                      >
+                        🛎️ CHAMANDO!
+                      </p>
+                    </div>
+                  )}
+                  {readyTables.has(table.id) && (
+                    <div
+                      style={{
+                        background: "#22c55e",
+                        borderRadius: 6,
+                        padding: "2px 6px",
+                        marginBottom: 4,
+                        display: "inline-block",
+                      }}
+                    >
+                      <p
+                        style={{ fontSize: 9, fontWeight: 700, color: "#fff" }}
+                      >
+                        🔔 PRONTO!
+                      </p>
+                    </div>
+                  )}
                   <p
                     style={{
                       fontFamily: "'Righteous', cursive",
                       fontSize: 28,
-                      color: cfg.text,
+                      color: calledTables.has(table.id)
+                        ? "#dc2626"
+                        : readyTables.has(table.id)
+                          ? "#15803d"
+                          : cfg.text,
                       lineHeight: 1,
                     }}
                   >

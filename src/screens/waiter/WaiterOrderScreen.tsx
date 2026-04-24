@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useWaiter, usePDVOrder } from "../../hooks/usePdv";
+import { supabase } from "../../lib/supabase";
+import { useWaiter, usePDVOrder } from "../../hooks/usePDV";
 import {
   fetchSizePricesForProduct,
   ProductSizePrice,
@@ -15,9 +16,8 @@ export default function WaiterOrderScreen() {
   const { tables, requestBill } = useWaiter();
   const table = tables.find((t) => t.id === tableId);
 
-  const { order, loading, addItem, removeItem, updateItemQty } = usePDVOrder(
-    tableId ?? null,
-  );
+  const { order, loading, addItem, removeItem, updateItemQty, refetch } =
+    usePDVOrder(tableId ?? null);
   const { products, categories } = useStoreProducts(order?.store_id ?? null);
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -96,6 +96,18 @@ export default function WaiterOrderScreen() {
     }
   }
 
+  async function handleMarkServed() {
+    if (!order || readyItems.length === 0) return;
+    for (const item of readyItems) {
+      await supabase
+        .from("pdv_order_items")
+        .update({ status: "served" })
+        .eq("id", item.id);
+    }
+    showToast("Itens entregues!");
+    await refetch();
+  }
+
   async function handleRequestBill() {
     if (!tableId) return;
     // Marca mesa como aguardando conta e abre tela de fechamento
@@ -106,6 +118,9 @@ export default function WaiterOrderScreen() {
   const orderTotal = order?.total ?? 0;
   const itemCount =
     order?.pdv_order_items?.reduce((s, i) => s + i.quantity, 0) ?? 0;
+  const readyItems =
+    order?.pdv_order_items?.filter((i) => i.status === "ready") ?? [];
+  const readyCount = readyItems.reduce((s, i) => s + i.quantity, 0);
 
   return (
     <div
@@ -158,23 +173,44 @@ export default function WaiterOrderScreen() {
                 {orderTotal.toFixed(2)}
               </p>
             </div>
-            <button
-              onClick={handleRequestBill}
-              disabled={itemCount === 0}
-              style={{
-                background: itemCount === 0 ? "#ccc" : "#f59e0b",
-                color: "#fff",
-                border: "none",
-                borderRadius: 10,
-                padding: "8px 14px",
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: itemCount === 0 ? "not-allowed" : "pointer",
-                fontFamily: "'Space Grotesk', sans-serif",
-              }}
-            >
-              Pedir conta
-            </button>
+            <div style={{ display: "flex", gap: 6 }}>
+              {readyCount > 0 && (
+                <button
+                  onClick={handleMarkServed}
+                  style={{
+                    background: "#22c55e",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 10,
+                    padding: "8px 14px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    animation: "none",
+                  }}
+                >
+                  ✓ Retirei ({readyCount})
+                </button>
+              )}
+              <button
+                onClick={handleRequestBill}
+                disabled={itemCount === 0}
+                style={{
+                  background: itemCount === 0 ? "#ccc" : "#f59e0b",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "8px 14px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: itemCount === 0 ? "not-allowed" : "pointer",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                Pedir conta
+              </button>
+            </div>
           </div>
 
           {/* Abas */}
@@ -426,6 +462,21 @@ export default function WaiterOrderScreen() {
                       <p style={{ fontSize: 11, color: "#888" }}>
                         R$ {Number(item.unit_price).toFixed(2)} cada
                       </p>
+                      {item.status === "ready" && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            background: "#f0fdf4",
+                            border: "1px solid #86efac",
+                            borderRadius: 6,
+                            padding: "1px 6px",
+                            color: "#15803d",
+                            fontWeight: 700,
+                          }}
+                        >
+                          🔔 Pronto para retirar
+                        </span>
+                      )}
                       {item.notes && (
                         <p
                           style={{
