@@ -18,7 +18,9 @@ export default function WaiterOrderScreen() {
 
   const { order, loading, addItem, removeItem, updateItemQty, refetch } =
     usePDVOrder(tableId ?? null);
-  const { products, categories } = useStoreProducts(order?.store_id ?? null);
+  const { products, categories } = useStoreProducts(
+    order?.store_id ?? storeId ?? null,
+  );
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [search, setSearch] = useState("");
