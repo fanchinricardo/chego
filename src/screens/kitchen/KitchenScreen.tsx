@@ -183,29 +183,9 @@ export default function KitchenScreen() {
 
   useEffect(() => {
     fetchItems();
-    if (!storeId) return;
-    const ch = supabase
-      .channel(`kitchen-${storeId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "pdv_order_items" },
-        fetchItems,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "order_items" },
-        fetchItems,
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "orders" },
-        fetchItems,
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
-  }, [fetchItems, storeId]);
+    const interval = setInterval(fetchItems, 5000);
+    return () => clearInterval(interval);
+  }, [fetchItems]);
 
   async function updateItemStatus(
     item: KitchenItem,
