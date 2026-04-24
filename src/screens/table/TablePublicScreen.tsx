@@ -31,18 +31,40 @@ export default function TablePublicScreen() {
   const [calling, setCalling] = useState(false);
   const [called, setCalled] = useState(false);
   const [error, setError] = useState("");
+  const [sessionInvalid, setSessionInvalid] = useState(false);
 
   useEffect(() => {
     if (!token) return;
     loadTable();
   }, [token]);
 
+  // Valida sessão — gera uma ao primeiro acesso, invalida se mesa foi reaberta
+  function getOrCreateSession(tableId: string, openedAt: string): boolean {
+    const key = `mesa_session_${tableId}`;
+    const stored = localStorage.getItem(key);
+    const sessionKey = `${tableId}_${openedAt}`; // muda quando mesa é reaberta
+
+    if (!stored) {
+      // Primeiro acesso — cria sessão
+      localStorage.setItem(key, sessionKey);
+      return true;
+    }
+    if (stored !== sessionKey) {
+      // Mesa foi reaberta — sessão antiga inválida
+      localStorage.removeItem(key);
+      return false;
+    }
+    return true;
+  }
+
   async function loadTable() {
     setLoading(true);
     // Busca mesa pelo qr_token
     const { data: t, error: e } = await supabase
       .from("pdv_tables")
-      .select("id, number, name, store_id, status, stores(name, logo_url)")
+      .select(
+        "id, number, name, store_id, status, opened_at, stores(name, logo_url)",
+      )
       .eq("qr_token", token)
       .maybeSingle();
 
@@ -51,6 +73,15 @@ export default function TablePublicScreen() {
       setLoading(false);
       return;
     }
+
+    // Valida sessão
+    const valid = getOrCreateSession(t.id, t.opened_at ?? t.id);
+    if (!valid) {
+      setSessionInvalid(true);
+      setLoading(false);
+      return;
+    }
+
     setTable(t as any);
 
     // Busca pedido aberto da mesa
@@ -106,6 +137,38 @@ export default function TablePublicScreen() {
         }}
       >
         <Spinner color={colors.rosa} />
+      </div>
+    );
+
+  if (sessionInvalid)
+    return (
+      <div
+        style={{
+          minHeight: "100dvh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: colors.fundo,
+          padding: 20,
+        }}
+      >
+        <div style={{ textAlign: "center", maxWidth: 300 }}>
+          <p style={{ fontSize: 48, marginBottom: 16 }}>🔒</p>
+          <p
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              color: colors.noite,
+              marginBottom: 8,
+            }}
+          >
+            Sessão expirada
+          </p>
+          <p style={{ fontSize: 13, color: "#888", lineHeight: 1.6 }}>
+            Esta mesa foi reaberta. Por favor, escaneie o QR Code novamente no
+            estabelecimento para iniciar uma nova sessão.
+          </p>
+        </div>
       </div>
     );
 
