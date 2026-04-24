@@ -172,6 +172,38 @@ export default function WaiterOrderScreen() {
                 {itemCount} {itemCount === 1 ? "item" : "itens"} · R${" "}
                 {orderTotal.toFixed(2)}
               </p>
+              {table?.pin && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginTop: 4,
+                  }}
+                >
+                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                    PIN do cliente:
+                  </p>
+                  <div
+                    style={{
+                      background: colors.rosa,
+                      borderRadius: 6,
+                      padding: "2px 10px",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontFamily: "'Righteous', cursive",
+                        fontSize: 16,
+                        color: "#fff",
+                        letterSpacing: "0.2em",
+                      }}
+                    >
+                      {table.pin}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               {readyCount > 0 && (

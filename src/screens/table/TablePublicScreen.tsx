@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
 import { colors, Spinner } from "../../components/ui";
 
-// Client público sem sessão
 const pub = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
   import.meta.env.VITE_SUPABASE_ANON_KEY as string,
@@ -30,66 +29,67 @@ const STATUS_LABEL: Record<string, string> = {
 export default function TablePublicScreen() {
   const { token } = useParams<{ token: string }>();
 
+  const [step, setStep] = useState<"pin" | "view">("pin");
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [checking, setChecking] = useState(false);
+
   const [tableName, setTableName] = useState("");
   const [storeName, setStoreName] = useState("");
+  const [tableId, setTableId] = useState("");
   const [items, setItems] = useState<OrderItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [sessionInvalid, setSessionInvalid] = useState(false);
   const [calling, setCalling] = useState(false);
   const [called, setCalled] = useState(false);
-  const [tableId, setTableId] = useState("");
 
-  useEffect(() => {
-    if (token) load();
-  }, [token]);
+  async function checkPin() {
+    if (pinInput.length !== 4) {
+      setPinError("Digite 4 dígitos");
+      return;
+    }
+    setChecking(true);
+    setPinError("");
 
-  async function load() {
-    setLoading(true);
-
-    // 1. Busca mesa
-    const { data: table, error: e1 } = await pub
+    const { data: table } = await pub
       .from("pdv_tables")
-      .select("id, number, name, status, opened_at, stores(name)")
+      .select("id, number, name, status, pin, stores(name)")
       .eq("qr_token", token)
       .maybeSingle();
 
-    if (e1 || !table) {
-      setError("Mesa não encontrada");
-      setLoading(false);
+    if (!table) {
+      setPinError("Mesa não encontrada");
+      setChecking(false);
       return;
     }
 
-    // 2. Verifica se mesa está ocupada
     if (table.status === "available" || table.status === "closed") {
-      setSessionInvalid(true);
-      setLoading(false);
+      setPinError("Esta mesa está fechada no momento");
+      setChecking(false);
       return;
     }
 
-    // 3. Valida sessão — invalida só se opened_at mudou (mesa foi reaberta)
-    const sessionKey = `mesa_${table.id}_${table.opened_at}`;
-    const stored = localStorage.getItem(`mesa_session_${table.id}`);
-
-    if (stored && stored !== sessionKey) {
-      // opened_at mudou — mesa foi reaberta com novo cliente
-      setSessionInvalid(true);
-      setLoading(false);
+    if (!table.pin || table.pin !== pinInput) {
+      setPinError("PIN incorreto. Solicite ao garçom.");
+      setChecking(false);
       return;
     }
 
-    // Salva ou renova sessão
-    localStorage.setItem(`mesa_session_${table.id}`, sessionKey);
-
+    // PIN correto — carrega dados
     setTableId(table.id);
     setTableName(table.name ?? `Mesa ${table.number}`);
     setStoreName((table as any).stores?.name ?? "");
+    await loadItems(table.id);
+    setStep("view");
+    setChecking(false);
+  }
 
-    // 4. Busca pedidos abertos
+  async function loadItems(tid: string) {
+    setLoading(true);
     const { data: orders } = await pub
       .from("pdv_orders")
       .select("id")
-      .eq("table_id", table.id)
+      .eq("table_id", tid)
       .eq("status", "open");
 
     if (!orders || orders.length === 0) {
@@ -98,8 +98,6 @@ export default function TablePublicScreen() {
     }
 
     const orderIds = orders.map((o: any) => o.id);
-
-    // 5. Busca itens
     const { data: orderItems } = await pub
       .from("pdv_order_items")
       .select("id, name, quantity, unit_price, total_price, notes, status")
@@ -123,22 +121,8 @@ export default function TablePublicScreen() {
 
   const total = items.reduce((s, i) => s + Number(i.total_price), 0);
 
-  if (loading)
-    return (
-      <div
-        style={{
-          minHeight: "100dvh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: colors.fundo,
-        }}
-      >
-        <Spinner color={colors.rosa} />
-      </div>
-    );
-
-  if (sessionInvalid)
+  // ── Tela de PIN ──────────────────────────────────────
+  if (step === "pin")
     return (
       <div
         style={{
@@ -148,77 +132,139 @@ export default function TablePublicScreen() {
           justifyContent: "center",
           background: colors.fundo,
           padding: 20,
+          fontFamily: "'Space Grotesk', sans-serif",
         }}
       >
-        <div style={{ textAlign: "center", maxWidth: 300 }}>
-          <p style={{ fontSize: 48, marginBottom: 16 }}>🔒</p>
+        <div style={{ width: "100%", maxWidth: 340, textAlign: "center" }}>
+          <p style={{ fontSize: 40, marginBottom: 12 }}>🔐</p>
           <p
             style={{
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: 700,
               color: colors.noite,
-              marginBottom: 8,
+              marginBottom: 6,
             }}
           >
-            Sessão expirada
+            Acesso à mesa
           </p>
-          <p
+          <p style={{ fontSize: 13, color: "#888", marginBottom: 28 }}>
+            Digite o PIN de 4 dígitos fornecido pelo garçom
+          </p>
+
+          {/* Input PIN */}
+          <div
             style={{
-              fontSize: 13,
-              color: "#888",
-              lineHeight: 1.6,
+              display: "flex",
+              justifyContent: "center",
+              gap: 10,
               marginBottom: 20,
             }}
           >
-            Esta mesa foi reaberta. Toque no botão abaixo para continuar.
-          </p>
-          <button
-            onClick={() => {
-              // Limpa sessão antiga e recarrega
-              Object.keys(localStorage)
-                .filter((k) => k.startsWith("mesa_session_"))
-                .forEach((k) => localStorage.removeItem(k));
-              window.location.reload();
-            }}
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                style={{
+                  width: 52,
+                  height: 64,
+                  borderRadius: 12,
+                  border: `2px solid ${pinInput.length > i ? colors.rosa : colors.bordaLilas}`,
+                  background: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: "'Righteous', cursive",
+                    fontSize: 28,
+                    color: colors.noite,
+                  }}
+                >
+                  {pinInput[i] ? "●" : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Teclado numérico */}
+          <div
             style={{
-              padding: "12px 24px",
-              borderRadius: 11,
-              background: colors.rosa,
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 10,
+              marginBottom: 16,
+            }}
+          >
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"].map(
+              (k) => (
+                <button
+                  key={k}
+                  disabled={!k}
+                  onClick={() => {
+                    if (k === "⌫") {
+                      setPinInput((p) => p.slice(0, -1));
+                      setPinError("");
+                    } else if (k && pinInput.length < 4) {
+                      setPinInput((p) => p + k);
+                      setPinError("");
+                    }
+                  }}
+                  style={{
+                    padding: "16px",
+                    borderRadius: 12,
+                    background:
+                      k === "⌫"
+                        ? colors.lilasClaro
+                        : k
+                          ? "#fff"
+                          : "transparent",
+                    border:
+                      k && k !== "⌫"
+                        ? `1px solid ${colors.bordaLilas}`
+                        : "none",
+                    fontSize: k === "⌫" ? 20 : 22,
+                    fontWeight: 700,
+                    color: colors.noite,
+                    cursor: k ? "pointer" : "default",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  {k}
+                </button>
+              ),
+            )}
+          </div>
+
+          {pinError && (
+            <p style={{ fontSize: 12, color: colors.rosa, marginBottom: 12 }}>
+              {pinError}
+            </p>
+          )}
+
+          <button
+            onClick={checkPin}
+            disabled={checking || pinInput.length !== 4}
+            style={{
+              width: "100%",
+              padding: "14px",
+              borderRadius: 12,
+              background: pinInput.length === 4 ? colors.rosa : "#ccc",
               color: "#fff",
               border: "none",
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: 700,
-              cursor: "pointer",
+              cursor: pinInput.length === 4 ? "pointer" : "default",
               fontFamily: "'Space Grotesk', sans-serif",
             }}
           >
-            🔄 Tentar novamente
+            {checking ? "Verificando..." : "Entrar"}
           </button>
         </div>
       </div>
     );
 
-  if (error)
-    return (
-      <div
-        style={{
-          minHeight: "100dvh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: colors.fundo,
-          padding: 20,
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <p style={{ fontSize: 40, marginBottom: 12 }}>❌</p>
-          <p style={{ fontSize: 16, fontWeight: 700, color: colors.noite }}>
-            {error}
-          </p>
-        </div>
-      </div>
-    );
-
+  // ── Tela de consumo ──────────────────────────────────
   return (
     <div
       style={{
@@ -228,7 +274,6 @@ export default function TablePublicScreen() {
         paddingBottom: 32,
       }}
     >
-      {/* Header */}
       <div style={{ background: colors.noite, padding: "20px 20px 24px" }}>
         <div style={{ maxWidth: 520, margin: "0 auto", textAlign: "center" }}>
           <p
@@ -262,8 +307,11 @@ export default function TablePublicScreen() {
           gap: 12,
         }}
       >
-        {/* Consumo */}
-        {items.length === 0 ? (
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 32 }}>
+            <Spinner color={colors.rosa} />
+          </div>
+        ) : items.length === 0 ? (
           <div
             style={{
               background: "#fff",
@@ -380,7 +428,6 @@ export default function TablePublicScreen() {
           </div>
         )}
 
-        {/* Botão chamar garçom */}
         <button
           onClick={callWaiter}
           disabled={calling || called}

@@ -11,6 +11,7 @@ export interface PDVTable {
   status: "available" | "occupied" | "waiting_payment" | "closed";
   waiter_id: string | null;
   opened_at: string | null;
+  pin: string | null;
   profiles?: { full_name: string } | null;
 }
 
@@ -88,12 +89,14 @@ export function useWaiter() {
       .select()
       .single();
     if (error) throw new Error(error.message);
+    const pin = String(Math.floor(1000 + Math.random() * 9000));
     await supabase
       .from("pdv_tables")
       .update({
         status: "occupied",
         waiter_id: user.id,
         opened_at: new Date().toISOString(),
+        pin,
       })
       .eq("id", tableId);
     return order;
