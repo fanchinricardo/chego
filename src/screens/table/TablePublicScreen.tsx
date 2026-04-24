@@ -67,14 +67,18 @@ export default function TablePublicScreen() {
       return;
     }
 
-    // 3. Valida sessão
+    // 3. Valida sessão — invalida só se opened_at mudou (mesa foi reaberta)
     const sessionKey = `mesa_${table.id}_${table.opened_at}`;
     const stored = localStorage.getItem(`mesa_session_${table.id}`);
+
     if (stored && stored !== sessionKey) {
+      // opened_at mudou — mesa foi reaberta com novo cliente
       setSessionInvalid(true);
       setLoading(false);
       return;
     }
+
+    // Salva ou renova sessão
     localStorage.setItem(`mesa_session_${table.id}`, sessionKey);
 
     setTableId(table.id);
@@ -158,10 +162,38 @@ export default function TablePublicScreen() {
           >
             Sessão expirada
           </p>
-          <p style={{ fontSize: 13, color: "#888", lineHeight: 1.6 }}>
-            Esta mesa foi reaberta. Escaneie o QR Code novamente para iniciar
-            uma nova sessão.
+          <p
+            style={{
+              fontSize: 13,
+              color: "#888",
+              lineHeight: 1.6,
+              marginBottom: 20,
+            }}
+          >
+            Esta mesa foi reaberta. Toque no botão abaixo para continuar.
           </p>
+          <button
+            onClick={() => {
+              // Limpa sessão antiga e recarrega
+              Object.keys(localStorage)
+                .filter((k) => k.startsWith("mesa_session_"))
+                .forEach((k) => localStorage.removeItem(k));
+              window.location.reload();
+            }}
+            style={{
+              padding: "12px 24px",
+              borderRadius: 11,
+              background: colors.rosa,
+              color: "#fff",
+              border: "none",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            🔄 Tentar novamente
+          </button>
         </div>
       </div>
     );
