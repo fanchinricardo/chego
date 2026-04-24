@@ -85,24 +85,13 @@ export default function WaiterTablesScreen() {
   useEffect(() => {
     fetchReadyTables();
     fetchCalls();
-    if (!storeId) return;
-    const ch = supabase
-      .channel(`waiter-ready-${storeId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "pdv_order_items" },
-        fetchReadyTables,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "pdv_table_calls" },
-        fetchCalls,
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
-  }, [fetchReadyTables, fetchCalls, storeId]);
+    // Polling a cada 5s para garantir atualização em tempo real
+    const interval = setInterval(() => {
+      fetchReadyTables();
+      fetchCalls();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [fetchReadyTables, fetchCalls]);
 
   // Piscar quando há mesas prontas ou chamadas
   useEffect(() => {
