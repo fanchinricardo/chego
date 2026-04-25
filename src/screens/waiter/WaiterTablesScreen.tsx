@@ -70,16 +70,27 @@ export default function WaiterTablesScreen() {
   }, [storeId]);
 
   // Busca mesas com itens prontos na cozinha
+  const [readyByMap, setReadyByMap] = useState<Record<string, string>>({});
+
   const fetchReadyTables = useCallback(async () => {
     if (!storeId) return;
     const { data } = await supabase
       .from("pdv_order_items")
-      .select("order_id, pdv_orders(table_id)")
+      .select(
+        "order_id, ready_by, pdv_orders!pdv_order_items_order_id_fkey(table_id), profiles:ready_by(full_name)",
+      )
       .eq("status", "ready");
-    const tableIds = new Set<string>(
-      (data ?? []).map((d: any) => d.pdv_orders?.table_id).filter(Boolean),
-    );
+    const tableIds = new Set<string>();
+    const byMap: Record<string, string> = {};
+    (data ?? []).forEach((d: any) => {
+      const tableId = d.pdv_orders?.table_id;
+      if (tableId) {
+        tableIds.add(tableId);
+        if (d.profiles?.full_name) byMap[tableId] = d.profiles.full_name;
+      }
+    });
     setReadyTables(tableIds);
+    setReadyByMap(byMap);
   }, [storeId]);
 
   useEffect(() => {
@@ -486,6 +497,9 @@ export default function WaiterTablesScreen() {
                         style={{ fontSize: 9, fontWeight: 700, color: "#fff" }}
                       >
                         🔔 PRONTO!
+                        {readyByMap[table.id]
+                          ? ` · ${readyByMap[table.id].split(" ")[0]}`
+                          : ""}
                       </p>
                     </div>
                   )}

@@ -80,6 +80,8 @@ function groupStatus(
 
 export default function KitchenScreen() {
   const { profile, signOut } = useAuth();
+  const userId = profile?.id ?? null;
+  const kitchenName = profile?.full_name ?? "Cozinha";
   const storeId = profile?.store_id ?? null;
   const kitchenCategories: string[] = profile?.kitchen_categories ?? [];
 
@@ -138,7 +140,8 @@ export default function KitchenScreen() {
       pdvGroups.push({
         order_id: order.id,
         table_label:
-          order.pdv_tables?.name ?? `Mesa ${order.pdv_tables?.number ?? "?"}`,
+          (order as any).table?.name ??
+          `Mesa ${(order as any).table?.number ?? "?"}`,
         waiter_name: order.profiles?.full_name ?? null,
         source: "pdv",
         created_at: order.created_at,
@@ -233,10 +236,9 @@ export default function KitchenScreen() {
         .filter((i) => i.status !== "served" && i.status !== next)
         .map((i) => i.id);
       for (const id of pendingIds) {
-        await supabase
-          .from("pdv_order_items")
-          .update({ status: next })
-          .eq("id", id);
+        const updateData: any = { status: next };
+        if (next === "ready") updateData.ready_by = userId;
+        await supabase.from("pdv_order_items").update(updateData).eq("id", id);
       }
       // Pisca a mesa quando pronto
       if (next === "ready") {

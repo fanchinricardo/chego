@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import Swal from "sweetalert2";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useWaiter, usePDVOrder } from "../../hooks/usePdv";
@@ -95,6 +96,7 @@ export default function WaiterOrderScreen() {
       setNoteText("");
       setNoteSizes([]);
       setNoteSelectedSize(null);
+      setTab("order"); // vai para aba comanda
     } catch (e: any) {
       showToast(e.message, "error");
     } finally {
@@ -116,7 +118,16 @@ export default function WaiterOrderScreen() {
 
   async function handleRequestBill() {
     if (!tableId) return;
-    // Marca mesa como aguardando conta e abre tela de fechamento
+    const { isConfirmed } = await Swal.fire({
+      title: "Fechar a conta?",
+      text: "A mesa será marcada como aguardando pagamento.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Sim, fechar conta",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#f59e0b",
+    });
+    if (!isConfirmed) return;
     await requestBill(tableId);
     navigate(`/waiter/bill/${tableId}`);
   }
@@ -426,7 +437,9 @@ export default function WaiterOrderScreen() {
                         color: colors.rosa,
                         fontWeight: 600,
                       }}
-                    ></p>
+                    >
+                      R$ {Number(product.price).toFixed(2)}
+                    </p>
                   </div>
                   <button
                     onClick={() => handleAddProduct(product)}

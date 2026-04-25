@@ -647,6 +647,15 @@ export default function WaiterBillScreen() {
     );
   }
 
+  async function handleCancelBill() {
+    if (!tableId) return;
+    await supabase
+      .from("pdv_tables")
+      .update({ status: "occupied" })
+      .eq("id", tableId);
+    navigate(`/waiter/table/${tableId}`);
+  }
+
   if (loading)
     return (
       <div
@@ -677,9 +686,7 @@ export default function WaiterBillScreen() {
         >
           <button
             onClick={() =>
-              mode === "view"
-                ? navigate(`/waiter/table/${tableId}`)
-                : setMode("view")
+              mode === "view" ? handleCancelBill() : setMode("view")
             }
             style={{
               background: "none",
