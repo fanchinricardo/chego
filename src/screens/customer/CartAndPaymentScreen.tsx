@@ -1,3 +1,4 @@
+import Swal from "sweetalert2";
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -42,6 +43,8 @@ export function CartScreen() {
 
   const [selectedAddr, setSelectedAddr] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
+  const [changeFor, setChangeFor] = useState("");
+  const [needsChange, setNeedsChange] = useState<boolean | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
@@ -102,6 +105,43 @@ export function CartScreen() {
         return;
       }
 
+      // Se dinheiro + entrega, pergunta sobre troco
+      let trocoFinal: number | null = null;
+      if (paymentMethod === "dinheiro" && deliveryType === "delivery") {
+        const { value: trocoValue, isConfirmed } = await Swal.fire({
+          title: "💵 Precisa de troco?",
+          html: `
+          <p style="font-size:14px;color:#666;margin-bottom:16px">Total do pedido: <strong>R$ ${total.toFixed(2)}</strong></p>
+          <input id="swal-troco" type="number" step="0.01" placeholder="Digite o valor (ex: 50,00)" class="swal2-input" style="font-size:16px"/>
+          <p style="font-size:12px;color:#aaa;margin-top:8px">Deixe em branco se não precisar de troco</p>
+        `,
+          showCancelButton: true,
+          confirmButtonText: "Confirmar pedido",
+          cancelButtonText: "Voltar",
+          confirmButtonColor: "#e9181c",
+          preConfirm: () => {
+            const val = (
+              document.getElementById("swal-troco") as HTMLInputElement
+            )?.value;
+            if (val && Number(val) < total) {
+              Swal.showValidationMessage(
+                "O valor deve ser maior que o total do pedido",
+              );
+              return false;
+            }
+            return val || null;
+          },
+        });
+        if (!isConfirmed) return;
+        if (trocoValue) {
+          setChangeFor(trocoValue);
+          trocoFinal = Number(trocoValue);
+        }
+      }
+
+      // Usa trocoValue direto pois setChangeFor é assíncrono
+      const changeForValue = trocoFinal;
+
       const { data: order, error: orderErr } = await supabase
         .from("orders")
         .insert({
@@ -124,23 +164,26 @@ export function CartScreen() {
           notes: notes.trim() || null,
           payment_method: paymentMethod,
           delivery_type: deliveryType,
+          change_for: changeForValue,
         })
         .select()
         .single();
 
       if (orderErr) throw new Error(orderErr.message);
 
-      const { error: itemsErr } = await supabase.from("order_items").insert(
-        items.map((item) => ({
-          order_id: order.id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-          unit_price: item.price,
-          total_price: item.price * item.quantity,
-          notes: item.notes ?? null,
-          custom_name: item.name ?? null,
-        })),
-      );
+      const { error: itemsErr } = await supabase
+        .from("order_items")
+        .insert(
+          items.map((item) => ({
+            order_id: order.id,
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_price: item.price,
+            total_price: item.price * item.quantity,
+            notes: item.notes ?? null,
+            custom_name: item.name ?? null,
+          })),
+        );
       if (itemsErr) throw new Error(itemsErr.message);
 
       notify.orderCreated(order.id);

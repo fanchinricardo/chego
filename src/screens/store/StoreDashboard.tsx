@@ -533,6 +533,7 @@ function OrderCard({
     credito_ent: "💳 Crédito",
     debito_ent: "💳 Débito",
   };
+  const changeFor = order.change_for;
   const payLabel =
     PAYMENT_LABEL[(order as any).payment_method ?? ""] ?? "💳 Pagamento";
   const isPaid = order.payment_status === "paid";
@@ -670,6 +671,21 @@ function OrderCard({
           </span>
         )}
         <span style={{ fontSize: 10, color: "#888" }}>{payLabel}</span>
+        {changeFor && (
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "2px 7px",
+              borderRadius: 8,
+              background: "#fff8e6",
+              color: "#b45309",
+              border: "1px solid #fcd34d",
+            }}
+          >
+            💵 Troco p/ R$ {Number(changeFor).toFixed(2)}
+          </span>
+        )}
         {isPaid ? (
           <span
             style={{

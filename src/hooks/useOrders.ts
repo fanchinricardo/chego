@@ -36,6 +36,7 @@ export interface Order {
   delivery_lat: number | null;
   delivery_lng: number | null;
   notes: string | null;
+  change_for: number | null;
   created_at: string;
   updated_at: string;
   profiles: { full_name: string; phone: string | null };
