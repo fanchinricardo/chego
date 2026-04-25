@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-import { useWaiter, usePDVOrder } from "../../hooks/usePdv";
+import { useWaiter, usePDVOrder } from "../../hooks/usePDV";
 import {
   fetchSizePricesForProduct,
   ProductSizePrice,
@@ -65,7 +65,11 @@ export default function WaiterOrderScreen() {
   }
 
   async function confirmAddProduct() {
-    if (!order || !noteProduct) return;
+    if (!noteProduct) return;
+    if (!order) {
+      showToast("Comanda não encontrada. Tente recarregar a página.", "error");
+      return;
+    }
     if (noteProduct.size_type === "sizes" && !noteSelectedSize) {
       showToast("Selecione um tamanho", "error");
       return;
@@ -422,9 +426,7 @@ export default function WaiterOrderScreen() {
                         color: colors.rosa,
                         fontWeight: 600,
                       }}
-                    >
-                      R$ {Number(product.price).toFixed(2)}
-                    </p>
+                    ></p>
                   </div>
                   <button
                     onClick={() => handleAddProduct(product)}
@@ -616,7 +618,9 @@ export default function WaiterOrderScreen() {
                       fontSize: 22,
                       color: colors.rosa,
                     }}
-                  ></p>
+                  >
+                    R$ {orderTotal.toFixed(2)}
+                  </p>
                 </div>
 
                 <button

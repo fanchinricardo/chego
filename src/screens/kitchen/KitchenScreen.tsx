@@ -96,7 +96,9 @@ export default function KitchenScreen() {
     // ── PDV ──────────────────────────────────────────────
     const { data: pdvOrders } = await supabase
       .from("pdv_orders")
-      .select("id, created_at, pdv_tables(number, name), profiles(full_name)")
+      .select(
+        "id, created_at, table:pdv_tables!pdv_orders_table_id_fkey(number, name), profiles(full_name)",
+      )
       .eq("store_id", storeId)
       .eq("status", "open");
 

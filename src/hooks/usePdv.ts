@@ -53,7 +53,9 @@ export function useWaiter() {
     setLoading(true);
     const { data } = await supabase
       .from("pdv_tables")
-      .select("*, profiles(full_name)")
+      .select(
+        "id, store_id, number, name, capacity, status, waiter_id, opened_at, pin, current_order_id, profiles(full_name)",
+      )
       .eq("store_id", storeId)
       .order("number");
     setTables((data ?? []) as PDVTable[]);
@@ -83,6 +85,15 @@ export function useWaiter() {
 
   async function openTable(tableId: string) {
     if (!user?.id || !storeId) return;
+
+    // Fecha pedidos antigos abertos para esta mesa
+    await supabase
+      .from("pdv_orders")
+      .update({ status: "closed", closed_at: new Date().toISOString() })
+      .eq("table_id", tableId)
+      .eq("status", "open");
+
+    // Cria novo pedido
     const { data: order, error } = await supabase
       .from("pdv_orders")
       .insert({ store_id: storeId, table_id: tableId, waiter_id: user.id })
@@ -122,9 +133,9 @@ export function usePDVOrder(tableId: string | null) {
 
   const fetchOrder = useCallback(async () => {
     if (!tableId) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("pdv_orders")
-      .select("*, pdv_order_items(*), pdv_tables(*)")
+      .select("*, pdv_order_items(*)")
       .eq("table_id", tableId)
       .eq("status", "open")
       .order("created_at", { ascending: false })
@@ -136,19 +147,9 @@ export function usePDVOrder(tableId: string | null) {
 
   useEffect(() => {
     fetchOrder();
-    if (!tableId) return;
-    const channel = supabase
-      .channel(`pdv-order-${tableId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "pdv_order_items" },
-        () => fetchOrder(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchOrder, tableId]);
+    const interval = setInterval(fetchOrder, 5000);
+    return () => clearInterval(interval);
+  }, [fetchOrder]);
 
   async function addItem(item: {
     product_id?: string;
