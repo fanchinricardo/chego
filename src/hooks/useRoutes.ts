@@ -12,6 +12,8 @@ export interface RouteStop {
   lat: number | null;
   lng: number | null;
   total: number;
+  payment_method: string | null;
+  change_for: number | null;
   delivered_at: string | null;
 }
 

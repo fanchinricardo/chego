@@ -17,6 +17,7 @@ export default function StoreProfileScreen() {
     name: "",
     phone: "",
     whatsapp: "",
+    pix_key: "",
     description: "",
     address: "",
     city: "",
@@ -42,6 +43,7 @@ export default function StoreProfileScreen() {
       name: store.name ?? "",
       phone: store.phone ?? "",
       whatsapp: store.whatsapp ?? "",
+      pix_key: (store as any).pix_key ?? "",
       description: store.description ?? "",
       address: store.address ?? "",
       city: store.city ?? "",
@@ -61,6 +63,7 @@ export default function StoreProfileScreen() {
         name: form.name.trim(),
         phone: form.phone.trim() || null,
         whatsapp: form.whatsapp.trim() || null,
+        pix_key: (form as any).pix_key?.trim() || null,
         description: form.description.trim() || null,
         address: form.address.trim(),
         city: form.city.trim(),
@@ -330,6 +333,7 @@ export default function StoreProfileScreen() {
                 path: "/store/billing",
               },
               { icon: "🪑", label: "Mesas", path: "/store/tables" },
+              { icon: "🖥️", label: "Caixa", path: "/cashier" },
               { icon: "🧑‍🍳", label: "Garçons", path: "/store/waiters" },
               { icon: "👨‍🍳", label: "Cozinha", path: "/store/kitchen" },
               {
@@ -444,6 +448,14 @@ export default function StoreProfileScreen() {
               setForm((f) => ({ ...f, whatsapp: e.target.value }))
             }
             placeholder="+5511999999999"
+          />
+          <Input
+            label="Chave Pix (opcional)"
+            value={(form as any).pix_key ?? ""}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, pix_key: e.target.value }) as any)
+            }
+            placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"
           />
 
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>

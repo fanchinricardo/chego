@@ -83,6 +83,7 @@ export default function KitchenScreen() {
   const userId = profile?.id ?? null;
   const kitchenName = profile?.full_name ?? "Cozinha";
   const storeId = profile?.store_id ?? null;
+
   const kitchenCategories: string[] = profile?.kitchen_categories ?? [];
 
   const [groups, setGroups] = useState<KitchenGroup[]>([]);

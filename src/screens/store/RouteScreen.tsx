@@ -81,11 +81,18 @@ export default function RouteScreen() {
             fontWeight: 700,
             color: "#fff",
             marginBottom: 2,
+            marginLeft: 16,
           }}
         >
           Entregas
         </p>
-        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+        <p
+          style={{
+            fontSize: 11,
+            color: "#fff",
+            marginLeft: 16,
+          }}
+        >
           Gerencie as rotas de entrega
         </p>
       </div>

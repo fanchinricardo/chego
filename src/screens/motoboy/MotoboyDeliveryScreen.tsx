@@ -180,7 +180,7 @@ export default function MotoboyDeliveryScreen() {
           style={{
             background: "none",
             border: "none",
-            color: "#fff",
+            color: "rgba(255,255,255,0.35)",
             fontSize: 13,
             cursor: "pointer",
             marginBottom: 10,
@@ -247,6 +247,54 @@ export default function MotoboyDeliveryScreen() {
           >
             R$ {Number(stop.total).toFixed(2)}
           </p>
+
+          {/* Status de pagamento */}
+          {(() => {
+            const pm = (stop as any).payment_method;
+            const cf = (stop as any).change_for;
+            const isPaid = pm === "pix_qr" || pm === "credito_mp";
+            if (isPaid)
+              return (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#15803d",
+                    fontWeight: 600,
+                    marginTop: 6,
+                    background: "#f0fdf4",
+                    borderRadius: 8,
+                    padding: "4px 10px",
+                    display: "inline-block",
+                  }}
+                >
+                  ✅ Já pago online
+                </p>
+              );
+            return (
+              <div style={{ marginTop: 6 }}>
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#b45309",
+                    fontWeight: 600,
+                    background: "#fff8e6",
+                    borderRadius: 8,
+                    padding: "4px 10px",
+                    display: "inline-block",
+                  }}
+                >
+                  💵 Cobrar na entrega: R$ {Number(stop.total).toFixed(2)}
+                </p>
+                {cf && (
+                  <p style={{ fontSize: 11, color: "#b45309", marginTop: 4 }}>
+                    Troco para R$ {Number(cf).toFixed(2)} · devolver R${" "}
+                    {(Number(cf) - Number(stop.total)).toFixed(2)}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+          <p style={{ display: "none" }}></p>
 
           {/* Navegar */}
           <a

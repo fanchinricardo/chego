@@ -59,7 +59,26 @@ export function useMotoboyData() {
 
     if (data) {
       setActiveRoute(data as DeliveryRoute);
-      setStops((data.route_json ?? []) as RouteStop[]);
+
+      // Busca delivered_at real das deliveries para atualizar os stops
+      const { data: deliveries } = await supabase
+        .from("deliveries")
+        .select("order_id, delivered_at")
+        .eq("route_id", data.id);
+
+      const deliveryMap: Record<string, string | null> = {};
+      (deliveries ?? []).forEach((d: any) => {
+        deliveryMap[d.order_id] = d.delivered_at;
+      });
+
+      const updatedStops = ((data.route_json ?? []) as RouteStop[]).map(
+        (s) => ({
+          ...s,
+          delivered_at: deliveryMap[s.order_id] ?? s.delivered_at ?? null,
+        }),
+      );
+
+      setStops(updatedStops);
     } else {
       setActiveRoute(null);
       setStops([]);
@@ -254,25 +273,29 @@ export function useMotoboyData() {
       console.log("✅ Entrega confirmada via Edge Function");
     }
 
-    // Atualiza stop local
+    // Atualiza stop local imediatamente
     setStops((prev) =>
       prev.map((s) =>
         s.order_id === orderId ? { ...s, delivered_at: now } : s,
       ),
     );
 
+    // Busca stops atualizados do banco para garantir sincronia
+    await fetchActiveRoute();
+
     // Verifica se todas as paradas foram entregues
-    const updatedStops = stops.map((s) =>
-      s.order_id === orderId ? { ...s, delivered_at: now } : s,
-    );
-    const allDone = updatedStops.every((s) => s.delivered_at);
+    const { data: updatedStopsDb } = await supabase
+      .from("deliveries")
+      .select("delivered_at")
+      .eq("route_id", activeRoute?.id ?? "");
+
+    const allDone = updatedStopsDb?.every((s) => s.delivered_at) ?? false;
 
     if (allDone && activeRoute) {
       await supabase
         .from("delivery_routes")
         .update({ status: "completed", completed_at: now })
         .eq("id", activeRoute.id);
-
       await fetchActiveRoute();
     }
   }

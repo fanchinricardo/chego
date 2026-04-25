@@ -13,14 +13,12 @@ interface StoreGroup {
 }
 
 interface FormData {
-  // Passo 0
   group_id: string;
-  // Passo 1
   name: string;
   description: string;
   phone: string;
   whatsapp: string;
-  // Passo 2
+  pix_key: string;
   address: string;
   city: string;
   state: string;
@@ -36,6 +34,7 @@ const EMPTY: FormData = {
   description: "",
   phone: "",
   whatsapp: "",
+  pix_key: "",
   address: "",
   city: "",
   state: "",
@@ -71,7 +70,6 @@ export default function StoreSetupScreen() {
     setTimeout(() => setToast(""), 3500);
   }
 
-  // Carrega grupos de comércio
   useEffect(() => {
     supabase
       .from("store_groups")
@@ -96,37 +94,29 @@ export default function StoreSetupScreen() {
 
   function validateStep1(): boolean {
     const e: Record<string, string> = {};
-
     if (!form.name.trim()) e.name = "Informe o nome da loja";
     else if (form.name.trim().length < 3)
       e.name = "Nome deve ter no mínimo 3 caracteres";
-
     const phoneDigits = form.phone.replace(/\D/g, "");
     if (!form.phone.trim()) e.phone = "Informe o telefone";
     else if (phoneDigits.length < 10) e.phone = "Informe o telefone com DDD";
-
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   function validateStep2(): boolean {
     const e: Record<string, string> = {};
-
     if (!form.address.trim()) e.address = "Informe o endereço";
     else if (form.address.trim().length < 5) e.address = "Endereço muito curto";
-
     if (!form.city.trim()) e.city = "Informe a cidade";
     else if (form.city.trim().length < 2) e.city = "Cidade inválida";
-
     if (!form.state.trim()) e.state = "Informe o estado (UF)";
     else if (form.state.trim().length !== 2)
       e.state = "Use a sigla do estado (ex: SP)";
-
     const cepDigits = form.zip_code.replace(/\D/g, "");
     if (!form.zip_code.trim()) e.zip_code = "Informe o CEP";
     else if (cepDigits.length !== 8)
       e.zip_code = "CEP inválido (deve ter 8 dígitos)";
-
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -141,11 +131,9 @@ export default function StoreSetupScreen() {
     if (!validateStep2()) return;
     if (!user) return;
     setSaving(true);
-
     try {
       let lat: number | null = pickedLat;
       let lng: number | null = pickedLng;
-
       try {
         if (!lat || !lng) {
           const geo = await geocodeAddress({
@@ -170,6 +158,7 @@ export default function StoreSetupScreen() {
         description: form.description.trim() || null,
         phone: form.phone.trim() || null,
         whatsapp: form.whatsapp.trim() || null,
+        pix_key: form.pix_key.trim() || null,
         address: form.address.trim(),
         city: form.city.trim(),
         state: form.state.trim().toUpperCase().slice(0, 2),
@@ -180,11 +169,12 @@ export default function StoreSetupScreen() {
         active: false,
         open_now: false,
         signup_paid: false,
+        lat,
+        lng,
       });
 
       if (error) throw new Error(error.message);
 
-      // Cria fatura de adesão
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const {
@@ -232,50 +222,51 @@ export default function StoreSetupScreen() {
       }}
     >
       {/* Header */}
-      <div style={{ background: colors.noite }}>
-        {step > 0 && (
-          <button
-            onClick={() => setStep((s) => (s - 1) as 0 | 1 | 2)}
+      <div style={{ background: colors.noite, padding: "16px 20px 20px" }}>
+        <div style={{ maxWidth: 520, margin: "0 auto" }}>
+          {step > 0 && (
+            <button
+              onClick={() => setStep((s) => (s - 1) as 0 | 1 | 2)}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "rgba(255,255,255,0.35)",
+                fontSize: 13,
+                fontFamily: "'Space Grotesk', sans-serif",
+                marginBottom: 12,
+                padding: 0,
+              }}
+            >
+              ← Voltar
+            </button>
+          )}
+          <StepBar total={3} current={step} />
+          <p
             style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "rgba(255,255,255,0.35)",
-              fontSize: 13,
-              fontFamily: "'Space Grotesk', sans-serif",
-              marginBottom: 12,
-              padding: 0,
+              fontSize: 11,
+              color: "rgba(255,255,255,0.3)",
+              marginBottom: 6,
+              marginTop: 8,
             }}
           >
-            ← Voltar
-          </button>
-        )}
-
-        <StepBar total={3} current={step} />
-
-        <p
-          style={{
-            fontSize: 11,
-            color: "rgba(255,255,255,0.3)",
-            marginBottom: 6,
-            marginTop: 8,
-          }}
-        >
-          Passo {step + 1} de 3
-        </p>
-        <p
-          style={{
-            fontSize: 22,
-            fontWeight: 700,
-            color: "#fff",
-            lineHeight: 1.2,
-          }}
-        >
-          {STEP_TITLES[step].title}{" "}
-          <span style={{ color: colors.rosa }}>{STEP_TITLES[step].accent}</span>
-        </p>
+            Passo {step + 1} de 3
+          </p>
+          <p
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              color: "#fff",
+              lineHeight: 1.2,
+            }}
+          >
+            {STEP_TITLES[step].title}{" "}
+            <span style={{ color: colors.rosa }}>
+              {STEP_TITLES[step].accent}
+            </span>
+          </p>
+        </div>
       </div>
-      {/* fecha maxWidth */}
 
       {/* Corpo */}
       <div
@@ -290,7 +281,7 @@ export default function StoreSetupScreen() {
           gap: 14,
         }}
       >
-        {/* ── PASSO 0: Tipo de comércio ── */}
+        {/* PASSO 0 */}
         {step === 0 && (
           <>
             <p style={{ fontSize: 13, color: "#888", marginBottom: 4 }}>
@@ -349,10 +340,9 @@ export default function StoreSetupScreen() {
           </>
         )}
 
-        {/* ── PASSO 1: Dados da loja ── */}
+        {/* PASSO 1 */}
         {step === 1 && (
           <>
-            {/* Preview do grupo selecionado */}
             {selectedGroup && (
               <div
                 style={{
@@ -439,7 +429,6 @@ export default function StoreSetupScreen() {
               type="tel"
               inputMode="numeric"
             />
-
             <Input
               label="WhatsApp (com DDI)"
               placeholder="+55 11 99999-9999"
@@ -448,6 +437,12 @@ export default function StoreSetupScreen() {
               type="tel"
               inputMode="numeric"
             />
+            <Input
+              label="Chave Pix (opcional)"
+              placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"
+              value={form.pix_key}
+              onChange={(e) => set("pix_key", e.target.value)}
+            />
 
             <Button variant="primary" fullWidth onClick={next}>
               Continuar →
@@ -455,7 +450,7 @@ export default function StoreSetupScreen() {
           </>
         )}
 
-        {/* ── PASSO 2: Endereço e entrega ── */}
+        {/* PASSO 2 */}
         {step === 2 && (
           <>
             <Input
@@ -500,7 +495,6 @@ export default function StoreSetupScreen() {
               inputMode="numeric"
             />
 
-            {/* Localização no mapa */}
             <div>
               <p
                 style={{

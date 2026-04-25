@@ -32,6 +32,7 @@ import StoreTablesScreen from "./screens/store/StoreTablesScreen";
 import StoreWaiterScreen from "./screens/store/StoreWaiterScreen";
 import StoreKitchenScreen from "./screens/store/StoreKitchenScreen";
 import TablePublicScreen from "./screens/table/TablePublicScreen";
+import CashierTablesScreen from "./screens/cashier/CashierTablesScreen";
 import KitchenScreen from "./screens/kitchen/KitchenScreen";
 import WaiterBillScreen from "./screens/waiter/WaiterBillScreen";
 import WaiterTablesScreen from "./screens/waiter/WaiterTablesScreen";
@@ -355,6 +356,14 @@ export default function App() {
             />
             {/* Garçom */}
             <Route path="/mesa/:token" element={<TablePublicScreen />} />
+            <Route
+              path="/cashier"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <CashierTablesScreen />
+                </PrivateRoute>
+              }
+            />
             <Route
               path="/kitchen"
               element={

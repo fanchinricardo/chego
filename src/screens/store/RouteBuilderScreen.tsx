@@ -93,6 +93,8 @@ export default function RouteBuilderScreen() {
           lat: lat ?? 0,
           lng: lng ?? 0,
           total: Number(o.total),
+          payment_method: o.payment_method ?? null,
+          change_for: o.change_for ? Number(o.change_for) : null,
         });
       }
 
@@ -158,12 +160,12 @@ export default function RouteBuilderScreen() {
         >
           Nova Rota
         </p>
-        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+        <p style={{ fontSize: 11, color: "#fff" }}>
           Selecione os pedidos prontos para entrega
         </p>
 
         {/* Barra de progresso dos passos */}
-        <div style={{ display: "flex", gap: 4, marginTop: 12 }}>
+        <div style={{ display: "flex", gap: 4, marginTop: 12, color: "#fff" }}>
           {[0, 1, 2].map((i) => (
             <div
               key={i}
@@ -176,9 +178,7 @@ export default function RouteBuilderScreen() {
             />
           ))}
         </div>
-        <p
-          style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 5 }}
-        >
+        <p style={{ fontSize: 10, color: "#fff", marginTop: 5 }}>
           Passo 1 de 3 — Selecionar pedidos
         </p>
       </div>

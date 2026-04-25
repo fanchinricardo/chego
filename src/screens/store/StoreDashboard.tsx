@@ -1,6 +1,7 @@
 import Swal from "sweetalert2";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { printReceipt, ReceiptData } from "../../components/ThermalReceipt";
 import { useStore } from "../../hooks/useStore";
 import { useOrders, Order, OrderStatus } from "../../hooks/useOrders";
 import { colors, Logo, Spinner, Toast } from "../../components/ui";
@@ -55,6 +56,7 @@ export default function StoreDashboard() {
     const interval = setInterval(() => {
       refetch();
     }, 2000);
+
     return () => clearInterval(interval);
   }, [storeLoading, store, refetch]);
 
@@ -178,6 +180,40 @@ export default function StoreDashboard() {
   });
 
   // ── Render principal ──────────────────────────────────────
+
+  async function handlePrintDelivery(order: Order) {
+    const items = order.order_items.map((i) => ({
+      name: i.custom_name ?? i.products?.name ?? "Item",
+      quantity: i.quantity,
+      unit_price: Number(i.unit_price),
+      total: Number(i.total_price),
+      notes: i.notes,
+    }));
+    const receiptData: ReceiptData = {
+      store: {
+        name: store?.name ?? "",
+        address: store?.address ?? null,
+        city: store?.city ?? null,
+        state: store?.state ?? null,
+        phone: store?.phone ?? null,
+      },
+      items,
+      subtotal: Number(order.subtotal),
+      total: Number(order.total),
+      payments: [
+        {
+          method: order.payment_method ?? "dinheiro",
+          amount: Number(order.total),
+        },
+      ],
+      order_code: order.id.slice(0, 6).toUpperCase(),
+      customer: order.profiles?.full_name ?? "Cliente",
+      type: "delivery",
+      printed_at: new Date().toISOString(),
+    };
+    printReceipt(receiptData);
+  }
+
   return (
     <div
       style={{
@@ -198,23 +234,41 @@ export default function StoreDashboard() {
           }}
         >
           <Logo size={22} />
-          <button
-            onClick={() => navigate("/store/notifications")}
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: "50%",
-              background: "rgba(233,30,140,0.12)",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 16,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            🔔
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={() => navigate("/cashier")}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.1)",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#fff",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              🖥️ Caixa
+            </button>
+            <button
+              onClick={() => navigate("/store/notifications")}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: "50%",
+                background: "rgba(233,30,140,0.12)",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 16,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              🔔
+            </button>
+          </div>
         </div>
         <p
           style={{
@@ -493,6 +547,7 @@ export default function StoreDashboard() {
             key={order.id}
             order={order}
             onUpdateStatus={handleUpdateStatus}
+            onPrint={handlePrintDelivery}
             onPress={() => navigate(`/store/orders/${order.id}`)}
           />
         ))}
@@ -509,10 +564,12 @@ function OrderCard({
   order,
   onUpdateStatus,
   onPress,
+  onPrint,
 }: {
   order: Order;
   onUpdateStatus: (id: string, next: OrderStatus) => void;
   onPress: () => void;
+  onPrint?: (order: Order) => void;
 }) {
   const sc = STATUS_COLORS[order.status];
   const next = STATUS_NEXT[order.status];
@@ -836,6 +893,27 @@ function OrderCard({
               👨‍🍳 Na cozinha
             </span>
           )}
+          {order.status === "ready" && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPrint?.(order);
+              }}
+              style={{
+                padding: "4px 10px",
+                borderRadius: 7,
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+                color: "#1d4ed8",
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              🖨️ Imprimir
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -869,6 +947,7 @@ export function BottomNav({
     },
     { key: "profile", icon: "👤", label: "Perfil", path: "/store/profile" },
   ];
+
   return (
     <div
       style={{
