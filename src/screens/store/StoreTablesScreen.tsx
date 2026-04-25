@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabase";
 import { useStore } from "../../hooks/useStore";
 import { colors, Input, Button, Spinner, Toast } from "../../components/ui";
 import { BottomNav } from "./StoreDashboard";
-import { PDVTable } from "../../hooks/usePDV";
+import { PDVTable } from "../../hooks/usePdv";
 
 interface PDVTableWithQR extends PDVTable {
   qr_token?: string;
