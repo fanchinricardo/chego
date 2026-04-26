@@ -3,7 +3,7 @@ import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
-import { useWaiter, PDVTable } from "../../hooks/usePDV";
+import { useWaiter, PDVTable } from "../../hooks/usePdv";
 import { colors, Spinner, Toast } from "../../components/ui";
 
 const STATUS_CONFIG = {
