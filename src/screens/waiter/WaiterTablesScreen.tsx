@@ -3,7 +3,7 @@ import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
-import { useWaiter, PDVTable } from "../../hooks/usePdv";
+import { useWaiter, PDVTable } from "../../hooks/usePDV";
 import { colors, Spinner, Toast } from "../../components/ui";
 
 const STATUS_CONFIG = {
@@ -77,14 +77,15 @@ export default function WaiterTablesScreen() {
     const { data } = await supabase
       .from("pdv_order_items")
       .select(
-        "order_id, ready_by, pdv_orders!pdv_order_items_order_id_fkey(table_id), profiles:ready_by(full_name)",
+        "order_id, ready_by, pdv_orders!pdv_order_items_order_id_fkey(table_id, status), profiles:ready_by(full_name)",
       )
       .eq("status", "ready");
     const tableIds = new Set<string>();
     const byMap: Record<string, string> = {};
     (data ?? []).forEach((d: any) => {
       const tableId = d.pdv_orders?.table_id;
-      if (tableId) {
+      const orderStatus = d.pdv_orders?.status;
+      if (tableId && orderStatus === "open") {
         tableIds.add(tableId);
         if (d.profiles?.full_name) byMap[tableId] = d.profiles.full_name;
       }

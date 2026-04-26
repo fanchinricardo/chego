@@ -154,23 +154,54 @@ export default function CashierTablesScreen() {
     if (!isConfirmed) return;
 
     let changeAmount = 0;
+    let amountPaid = total;
     if (method === "dinheiro") {
-      const { value: received } = await Swal.fire({
-        title: "Valor recebido",
-        input: "number",
-        inputLabel: `Total: R$ ${total.toFixed(2)}`,
-        inputPlaceholder: "0,00",
-        confirmButtonText: "OK",
+      const totalStr = total.toFixed(2);
+      const { value: received, isConfirmed: confirmedPay } = await Swal.fire({
+        title: "Valor recebido em dinheiro",
+        html: `
+          <p style="margin-bottom:10px;color:#666">Total a pagar: <strong>R$ ${totalStr}</strong></p>
+          <p style="font-size:12px;color:#aaa;margin-bottom:6px">Digite o valor entregue pelo cliente</p>
+          <input id="swal-valor" type="number" step="0.01" min="${totalStr}" value="${totalStr}"
+            class="swal2-input" style="font-size:18px;font-weight:700"/>
+          <p id="swal-troco" style="margin-top:10px;font-size:14px;color:#15803d;font-weight:600"></p>
+        `,
+        confirmButtonText: "Confirmar",
         confirmButtonColor: "#22c55e",
-        preConfirm: (val) => {
+        showCancelButton: true,
+        cancelButtonText: "Cancelar",
+        didOpen: () => {
+          const input = document.getElementById(
+            "swal-valor",
+          ) as HTMLInputElement;
+          const trocoEl = document.getElementById("swal-troco")!;
+          input.addEventListener("input", () => {
+            const v = Number(input.value);
+            if (v > total) {
+              trocoEl.textContent = "Troco: R$ " + (v - total).toFixed(2);
+            } else {
+              trocoEl.textContent = "";
+            }
+          });
+        },
+        preConfirm: () => {
+          const val = (
+            document.getElementById("swal-valor") as HTMLInputElement
+          )?.value;
           if (!val || Number(val) < total) {
-            Swal.showValidationMessage(`Valor mínimo: R$ ${total.toFixed(2)}`);
+            Swal.showValidationMessage("Valor mínimo: R$ " + totalStr);
             return false;
           }
           return val;
         },
       });
-      if (received) changeAmount = Math.max(0, Number(received) - total);
+      if (!confirmedPay) return;
+      if (received) {
+        amountPaid = Number(received);
+        const diffCents =
+          Math.round(amountPaid * 100) - Math.round(total * 100);
+        changeAmount = diffCents > 0 ? diffCents / 100 : 0;
+      }
     }
 
     // Salva split e pagamento
@@ -191,10 +222,17 @@ export default function CashierTablesScreen() {
         order_id: order.id,
         split_id: split.id,
         method,
-        amount: total,
+        amount: method === "dinheiro" ? amountPaid : total,
         change_amount: changeAmount,
       });
     }
+
+    // Marca todos itens não entregues como served
+    await supabase
+      .from("pdv_order_items")
+      .update({ status: "served" })
+      .eq("order_id", order.id)
+      .in("status", ["pending", "preparing", "ready"]);
 
     await supabase
       .from("pdv_orders")
@@ -230,7 +268,13 @@ export default function CashierTablesScreen() {
       subtotal: order.total,
       tip: tip || null,
       total,
-      payments: [{ method, amount: total, change: changeAmount }],
+      payments: [
+        {
+          method,
+          amount: method === "dinheiro" ? amountPaid : total,
+          change: changeAmount > 0 ? changeAmount : undefined,
+        },
+      ],
       table: selected.name ?? `Mesa ${selected.number}`,
       type: "pdv",
       printed_at: new Date().toISOString(),
@@ -307,6 +351,22 @@ export default function CashierTablesScreen() {
               </p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => navigate("/cashier/pdv")}
+                style={{
+                  background: colors.rosa,
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "8px 14px",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                🏪 Balcão
+              </button>
               <button
                 onClick={() => navigate("/store")}
                 style={{
@@ -655,7 +715,46 @@ export default function CashierTablesScreen() {
 
                 {/* Botões */}
                 <button
-                  onClick={() =>
+                  onClick={async () => {
+                    // Refetch itens para garantir dados atualizados
+                    const { data: freshItems } = await supabase
+                      .from("pdv_order_items")
+                      .select("*")
+                      .eq("order_id", order.id);
+                   
+                    const currentItems = freshItems ?? order.pdv_order_items;
+
+                   
+                    // Verifica itens pendentes/preparando
+                    const pendingItems = currentItems.filter((i: any) =>
+                      ["pending", "preparing"].includes(i.status),
+                    );
+                    if (pendingItems.length > 0) {
+                      await Swal.fire({
+                        title: "⚠️ Itens em preparo",
+                        html: `<p>Ainda há <strong>${pendingItems.length} item(s)</strong> sendo preparado(s) ou aguardando a cozinha.</p><p style="margin-top:8px;color:#888;font-size:13px">Aguarde a cozinha marcar como pronto e o garçom confirmar a entrega.</p>`,
+                        icon: "warning",
+                        confirmButtonText: "Entendido",
+                        confirmButtonColor: "#f59e0b",
+                      });
+                      return;
+                    }
+                    // Verifica itens prontos mas não entregues
+                    const readyItems = currentItems.filter(
+                      (i: any) => i.status === "ready",
+                    );
+                    if (readyItems.length > 0) {
+                      const { isConfirmed } = await Swal.fire({
+                        title: "⚠️ Itens prontos não entregues",
+                        html: `<p>Há <strong>${readyItems.length} item(s)</strong> prontos que ainda não foram entregues ao cliente.</p><p style="margin-top:8px;color:#888;font-size:13px">Deseja fechar assim mesmo?</p>`,
+                        icon: "warning",
+                        showCancelButton: true,
+                        confirmButtonText: "Fechar mesmo assim",
+                        cancelButtonText: "Cancelar",
+                        confirmButtonColor: "#f59e0b",
+                      });
+                      if (!isConfirmed) return;
+                    }
                     Swal.fire({
                       title: "Gorjeta de 10%?",
                       html: `<p>Subtotal: <b>R$ ${Number(order.total).toFixed(2)}</b></p><p>Com gorjeta: <b>R$ ${(Number(order.total) * 1.1).toFixed(2)}</b></p>`,
@@ -665,8 +764,8 @@ export default function CashierTablesScreen() {
                       denyButtonText: "Sem gorjeta",
                       confirmButtonColor: "#f59e0b",
                       denyButtonColor: colors.noite,
-                    }).then((result) => handleClose(result.isConfirmed))
-                  }
+                    }).then((result) => handleClose(result.isConfirmed));
+                  }}
                   style={{
                     width: "100%",
                     padding: "13px",

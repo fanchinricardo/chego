@@ -270,7 +270,7 @@ export function useMotoboyData() {
     if (!res.ok) {
       console.error("❌ Erro na Edge Function:", result.error);
     } else {
-      console.log("✅ Entrega confirmada via Edge Function");
+      
     }
 
     // Atualiza stop local imediatamente

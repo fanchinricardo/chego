@@ -38,7 +38,7 @@ export async function geocodeAddress(input: {
   state: string;
   zip_code: string;
 }): Promise<{ lat: number; lng: number } | null> {
-  console.log("🗺️ geocodeAddress chamado:", input);
+
   const cep = input.zip_code.replace(/\D/g, "");
 
   let cidade = input.city;
@@ -70,7 +70,7 @@ export async function geocodeAddress(input: {
       if (r.ok) {
         const d = await r.json();
         if (d?.length > 0) {
-          console.log("✅ Geocode OK:", cidade, d[0].lat, d[0].lon);
+         
           return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
         }
       }

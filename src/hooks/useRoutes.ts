@@ -184,8 +184,6 @@ export function useRouteGps(routeId: string | null) {
   useEffect(() => {
     if (!routeId) return;
 
-    console.log("👀 useRouteGps: buscando GPS para route:", routeId);
-
     // Busca última posição
     supabase
       .from("gps_locations")

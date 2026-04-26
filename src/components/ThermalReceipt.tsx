@@ -86,7 +86,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
       <span>${METHOD_LABEL[p.method] ?? p.method}</span>
       <span>R$ ${p.amount.toFixed(2)}</span>
     </div>
-    ${p.change && p.change > 0 ? `<div class="row muted"><span>Troco</span><span>R$ ${p.change.toFixed(2)}</span></div>` : ""}
+    ${p.change && Math.round(p.change * 100) > 0 ? `<div class="row muted"><span>Troco</span><span>R$ ${p.change.toFixed(2)}</span></div>` : ""}
   `,
     )
     .join("");

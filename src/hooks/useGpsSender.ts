@@ -35,7 +35,7 @@ export function useGpsSender(routeId: string | null, motoboyId: string | null) {
         accuracy,
         active: true,
       }));
-      console.log("📡 Enviando GPS:", latitude, longitude, "route:", routeId);
+      
 
       try {
         const { error } = await supabase.from("gps_locations").insert({

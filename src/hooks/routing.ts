@@ -69,7 +69,7 @@ export async function geocodeAddress(input: {
       if (r.ok) {
         const d = await r.json();
         if (d?.length > 0) {
-          console.log("✅ Geocode OK:", cidade, d[0].lat, d[0].lon);
+          
           return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
         }
       }

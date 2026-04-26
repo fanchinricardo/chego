@@ -236,6 +236,22 @@ export default function StoreDashboard() {
           <Logo size={22} />
           <div style={{ display: "flex", gap: 6 }}>
             <button
+              onClick={() => navigate("/cashier/pdv")}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.1)",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#fff",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              🏪 Balcão
+            </button>
+            <button
               onClick={() => navigate("/cashier")}
               style={{
                 padding: "6px 12px",

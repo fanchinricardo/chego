@@ -7,6 +7,7 @@ import {
   fetchSizePricesForProduct,
   ProductSizePrice,
 } from "../../hooks/useProductSizes";
+import { ProductModal, CartItem } from "../../components/ProductModal";
 import { useStoreProducts } from "../../hooks/useCustomer";
 import { colors, Spinner, Toast } from "../../components/ui";
 
@@ -51,52 +52,29 @@ export default function WaiterOrderScreen() {
     });
   }, [products, activeCategory, search]);
 
-  async function handleAddProduct(product: any) {
+  function handleAddProduct(product: any) {
     setNoteProduct(product);
-    setNoteText("");
-    setNoteSizes([]);
-    setNoteSelectedSize(null);
-    if (product.size_type === "sizes") {
-      setLoadingSizes(true);
-      const sizes = await fetchSizePricesForProduct(product.id);
-      setNoteSizes(sizes);
-      if (sizes.length > 0) setNoteSelectedSize(sizes[0]);
-      setLoadingSizes(false);
-    }
   }
 
-  async function confirmAddProduct() {
-    if (!noteProduct) return;
+  async function handleCartItemAdd(item: CartItem) {
     if (!order) {
       showToast("Comanda não encontrada. Tente recarregar a página.", "error");
       return;
     }
-    if (noteProduct.size_type === "sizes" && !noteSelectedSize) {
-      showToast("Selecione um tamanho", "error");
-      return;
-    }
-    setAdding(noteProduct.id);
+    setAdding(item.product_id);
     try {
-      const sizeName = noteSelectedSize?.product_sizes?.name;
-      const sizePrice = noteSelectedSize
-        ? Number(noteSelectedSize.price)
-        : Number(noteProduct.price);
-      const itemName = sizeName
-        ? `${noteProduct.name} (${sizeName})`
-        : noteProduct.name;
-      await addItem({
-        product_id: noteProduct.id,
-        name: itemName,
-        quantity: 1,
-        unit_price: sizePrice,
-        notes: noteText.trim() || undefined,
-      });
-      showToast(`${itemName} adicionado!`);
+      for (let q = 0; q < item.quantity; q++) {
+        await addItem({
+          product_id: item.product_id,
+          name: item.name,
+          quantity: item.quantity,
+          unit_price: item.price,
+          notes: item.notes || undefined,
+        });
+      }
+      showToast(`${item.name} adicionado!`);
       setNoteProduct(null);
-      setNoteText("");
-      setNoteSizes([]);
-      setNoteSelectedSize(null);
-      setTab("order"); // vai para aba comanda
+      setTab("order");
     } catch (e: any) {
       showToast(e.message, "error");
     } finally {
@@ -118,6 +96,53 @@ export default function WaiterOrderScreen() {
 
   async function handleRequestBill() {
     if (!tableId) return;
+
+    // Busca itens atualizados do banco
+    const { data: freshItems } = await supabase
+      .from("pdv_order_items")
+      .select("*")
+      .eq("order_id", order?.id ?? "");
+    const currentItems = freshItems ?? order?.pdv_order_items ?? [];
+
+    // Bloqueia se tiver itens pendentes ou em preparo
+    const pendingItems = currentItems.filter((i: any) =>
+      ["pending", "preparing"].includes(i.status),
+    );
+    if (pendingItems.length > 0) {
+      await Swal.fire({
+        title: "⚠️ Itens em preparo",
+        html: `<p>Ainda há <strong>${pendingItems.length} item(s)</strong> sendo preparado(s) ou aguardando a cozinha.</p><p style="margin-top:8px;color:#888;font-size:13px">Aguarde a cozinha marcar como pronto e confirme a entrega antes de fechar.</p>`,
+        icon: "warning",
+        confirmButtonText: "Entendido",
+        confirmButtonColor: "#f59e0b",
+      });
+      return;
+    }
+
+    // Avisa se tiver itens prontos não entregues
+    const readyNotServed = currentItems.filter(
+      (i: any) => i.status === "ready",
+    );
+    if (readyNotServed.length > 0) {
+      const { isConfirmed: proceed } = await Swal.fire({
+        title: "⚠️ Itens prontos não entregues",
+        html: `<p>Há <strong>${readyNotServed.length} item(s)</strong> prontos que ainda não foram entregues.</p><p style="margin-top:8px;color:#888;font-size:13px">Deseja fechar mesmo assim?</p>`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Fechar mesmo assim",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#f59e0b",
+      });
+      if (!proceed) return;
+      // Marca itens prontos como entregues
+      for (const item of readyNotServed) {
+        await supabase
+          .from("pdv_order_items")
+          .update({ status: "served" })
+          .eq("id", item.id);
+      }
+    }
+
     const { isConfirmed } = await Swal.fire({
       title: "Fechar a conta?",
       text: "A mesa será marcada como aguardando pagamento.",
@@ -665,171 +690,13 @@ export default function WaiterOrderScreen() {
 
       {/* Modal de observação */}
       {noteProduct && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 200,
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: "20px 20px 0 0",
-              width: "100%",
-              maxWidth: 520,
-              padding: "20px 20px 32px",
-            }}
-          >
-            <p
-              style={{
-                fontSize: 16,
-                fontWeight: 700,
-                color: colors.noite,
-                marginBottom: 4,
-              }}
-            >
-              {noteProduct.name}
-            </p>
-            <p
-              style={{
-                fontSize: 13,
-                color: colors.rosa,
-                fontWeight: 600,
-                marginBottom: noteProduct.size_type === "sizes" ? 12 : 16,
-              }}
-            >
-              {noteSelectedSize
-                ? `R$ ${Number(noteSelectedSize.price).toFixed(2)}`
-                : noteProduct.price > 0
-                  ? `R$ ${Number(noteProduct.price).toFixed(2)}`
-                  : "Selecione o tamanho"}
-            </p>
-            {noteProduct.size_type === "sizes" && (
-              <div style={{ marginBottom: 14 }}>
-                <p
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#aaa",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    marginBottom: 8,
-                  }}
-                >
-                  Tamanho
-                </p>
-                {loadingSizes ? (
-                  <p style={{ fontSize: 12, color: "#aaa" }}>Carregando...</p>
-                ) : (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {noteSizes.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => setNoteSelectedSize(s)}
-                        style={{
-                          padding: "8px 16px",
-                          borderRadius: 20,
-                          border: `1.5px solid ${noteSelectedSize?.id === s.id ? colors.rosa : colors.bordaLilas}`,
-                          background:
-                            noteSelectedSize?.id === s.id
-                              ? "#fff0f8"
-                              : "#fafafa",
-                          color:
-                            noteSelectedSize?.id === s.id
-                              ? colors.rosa
-                              : "#888",
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          fontFamily: "'Space Grotesk', sans-serif",
-                        }}
-                      >
-                        {s.product_sizes?.name} · R${" "}
-                        {Number(s.price).toFixed(2)}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "#aaa",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                marginBottom: 6,
-              }}
-            >
-              Observação (opcional)
-            </p>
-            <textarea
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Ex: sem cebola, bem passado, sem gelo..."
-              rows={3}
-              autoFocus
-              style={{
-                width: "100%",
-                border: `1.5px solid ${colors.bordaLilas}`,
-                borderRadius: 10,
-                padding: "10px 12px",
-                fontSize: 13,
-                color: colors.noite,
-                fontFamily: "'Space Grotesk', sans-serif",
-                resize: "none",
-                outline: "none",
-                marginBottom: 14,
-              }}
-            />
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={() => {
-                  setNoteProduct(null);
-                  setNoteText("");
-                }}
-                style={{
-                  flex: 1,
-                  padding: "12px",
-                  borderRadius: 11,
-                  background: colors.lilasClaro,
-                  color: "#7e22ce",
-                  border: "none",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: "'Space Grotesk', sans-serif",
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmAddProduct}
-                disabled={adding === noteProduct.id}
-                style={{
-                  flex: 2,
-                  padding: "12px",
-                  borderRadius: 11,
-                  background: colors.rosa,
-                  color: "#fff",
-                  border: "none",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: "'Space Grotesk', sans-serif",
-                }}
-              >
-                {adding === noteProduct.id ? "Adicionando..." : "+ Adicionar"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ProductModal
+          product={noteProduct}
+          storeId={storeId ?? ""}
+          allProducts={products}
+          onAdd={handleCartItemAdd}
+          onClose={() => setNoteProduct(null)}
+        />
       )}
 
       {toast && <Toast message={toast} type={toastType} />}

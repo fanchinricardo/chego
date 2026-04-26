@@ -59,14 +59,7 @@ export function ProductModal({
   const [halfSizes, setHalfSizes] = useState<ProductSizePrice[]>([]);
   const [halfSearch, setHalfSearch] = useState("");
 
-  // Debug — remover após confirmar
-  console.log("[ProductModal]", product.name, {
-    allows_half: product.allows_half,
-    size_type: product.size_type,
-    halfCandidatesCount: allProducts.filter(
-      (p) => p.allows_half === true && p.id !== product.id,
-    ).length,
-  });
+  
 
   const hasSizes = product.size_type === "sizes";
   const allowsHalf = product.allows_half === true; // defensivo contra null/undefined

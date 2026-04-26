@@ -37,10 +37,7 @@ export default function CustomerStoreScreen() {
   }
 
   function openProduct(product: any) {
-    console.log("🍕 openProduct chamado:", product.name, {
-      allows_half: product.allows_half,
-      size_type: product.size_type,
-    });
+   
     setSelectedProduct(product);
     setProductQty(1);
     setProductNotes("");

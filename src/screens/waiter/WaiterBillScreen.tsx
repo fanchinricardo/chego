@@ -286,6 +286,13 @@ export default function WaiterBillScreen() {
           }
         }
       }
+      // Marca todos itens não entregues como served
+      await supabase
+        .from("pdv_order_items")
+        .update({ status: "served" })
+        .eq("order_id", order.id)
+        .in("status", ["pending", "preparing", "ready"]);
+
       await supabase
         .from("pdv_orders")
         .update({ status: "closed", closed_at: new Date().toISOString() })
