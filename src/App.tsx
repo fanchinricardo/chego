@@ -33,7 +33,7 @@ import StoreWaiterScreen from "./screens/store/StoreWaiterScreen";
 import StoreKitchenScreen from "./screens/store/StoreKitchenScreen";
 import TablePublicScreen from "./screens/table/TablePublicScreen";
 import CashierTablesScreen from "./screens/cashier/CashierTablesScreen";
-import CashierPDVScreen from "./screens/cashier/CashierPDVScreen";
+import CashierPDVScreen from "./screens/cashier/CashierPdvScreen";
 import KitchenScreen from "./screens/kitchen/KitchenScreen";
 import WaiterBillScreen from "./screens/waiter/WaiterBillScreen";
 import WaiterTablesScreen from "./screens/waiter/WaiterTablesScreen";
