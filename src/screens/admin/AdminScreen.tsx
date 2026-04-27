@@ -272,7 +272,7 @@ export default function AdminScreen() {
           </p>
           <div style={{ display: "flex", gap: 6 }}>
             <button
-              onClick={() => (window.location.href = "/support")}
+              onClick={() => navigate("/support")}
               style={{
                 background: "rgba(255,255,255,0.1)",
                 border: "none",
