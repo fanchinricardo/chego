@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { colors, Input, Button, StepBar, Toast } from "../../components/ui";
 import { LocationPicker } from "../../components/LocationPicker";
+import Swal from "sweetalert2";
 import { geocodeAddress } from "../../hooks/routing";
 
 interface StoreGroup {
@@ -121,9 +122,49 @@ export default function StoreSetupScreen() {
     return Object.keys(e).length === 0;
   }
 
-  function next() {
+  async function next() {
     if (step === 0 && !validateStep0()) return;
-    if (step === 1 && !validateStep1()) return;
+    if (step === 1) {
+      if (!validateStep1()) return;
+
+      // Busca taxas do admin
+      const { data: config } = await supabase
+        .from("admin_config")
+        .select("signup_fee, monthly_pct")
+        .single();
+
+      const fee = config?.signup_fee
+        ? Number(config.signup_fee).toFixed(2)
+        : "1,00";
+      const pct = config?.monthly_pct
+        ? Number(config.monthly_pct).toFixed(0)
+        : "5";
+
+      const { isConfirmed } = await Swal.fire({
+        title: "📋 Termos de uso",
+        html: `
+          <div style="text-align:left;font-size:14px;line-height:1.7;color:#333">
+            <p>Antes de continuar, leia as condições de uso do <strong>Chegô</strong>:</p>
+            <br/>
+            <p>💳 <strong>Taxa de adesão:</strong> R$ ${fee}</p>
+            <p style="font-size:12px;color:#888;margin-top:-6px">Cobrada uma única vez para ativar sua loja na plataforma.</p>
+            <br/>
+            <p>📊 <strong>Comissão sobre vendas:</strong> ${pct}% ao mês</p>
+            <p style="font-size:12px;color:#888;margin-top:-6px">Calculada sobre o total de pedidos realizados pelo app no mês anterior. Valor mínimo de R$ 9,90/mês.</p>
+            <br/>
+            <p>✅ Ao continuar você declara que leu e concorda com os termos acima.</p>
+          </div>
+        `,
+        icon: "info",
+        showCancelButton: true,
+        confirmButtonText: "✅ Concordo, continuar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#e9181c",
+        width: 480,
+      });
+
+      if (!isConfirmed) return;
+    }
     setStep((s) => (s + 1) as 0 | 1 | 2);
   }
 
@@ -231,7 +272,7 @@ export default function StoreSetupScreen() {
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                color: "#fff",
+                color: "rgba(255,255,255,0.35)",
                 fontSize: 13,
                 fontFamily: "'Space Grotesk', sans-serif",
                 marginBottom: 12,

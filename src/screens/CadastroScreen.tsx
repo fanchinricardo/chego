@@ -25,7 +25,7 @@ const ACCOUNT_TYPES: AccountType[] = [
   {
     role: "customer",
     icon: "🛍️",
-    label: "Cliente",
+    label: "Conta grátis Cliente",
     sub: "Quero comprar nos comércios",
   },
   {

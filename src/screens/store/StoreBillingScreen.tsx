@@ -108,6 +108,14 @@ export default function StoreBillingScreen() {
       .select("*")
       .eq("store_id", store.id)
       .order("created_at", { ascending: false });
+    console.log(
+      "[Billing] invoices:",
+      data?.map((i) => ({
+        id: i.id,
+        qr: !!i.qr_code_base64,
+        status: i.status,
+      })),
+    );
     setInvoices((data ?? []) as Invoice[]);
     setLoading(false);
   }
@@ -116,18 +124,15 @@ export default function StoreBillingScreen() {
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    const res = await fetch(
-      `${SUPABASE_URL}/functions/v1/check-invoice-payment`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token ?? SUPABASE_KEY}`,
-          apikey: SUPABASE_KEY,
-        },
-        body: JSON.stringify(body),
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/store-billing`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.access_token ?? SUPABASE_KEY}`,
+        apikey: SUPABASE_KEY,
       },
-    );
+      body: JSON.stringify(body),
+    });
     return res.json();
   }
 
@@ -153,6 +158,26 @@ export default function StoreBillingScreen() {
     }
   }
 
+  async function handleCheckout(invoice: Invoice) {
+    setGenerating(invoice.id + "_card");
+    try {
+      const data = await callBilling({
+        action: "generate_checkout",
+        invoice_id: invoice.id,
+        store_id: store?.id ?? "",
+      });
+      if (data.error) throw new Error(data.error);
+      // Abre link do MP em nova aba
+      window.open(data.checkout_url, "_blank");
+      // Polling para verificar pagamento
+      startPolling(invoice.id);
+    } catch (err: any) {
+      showToast(err.message, "error");
+    } finally {
+      setGenerating(null);
+    }
+  }
+
   async function handleGenerateQR(invoice: Invoice) {
     setGenerating(invoice.id);
     try {
@@ -163,7 +188,9 @@ export default function StoreBillingScreen() {
       });
       if (data.error) throw new Error(data.error);
       showToast("QR Code gerado!");
-      fetchInvoices();
+      await fetchInvoices();
+      // Re-fetch após 1s para garantir dados atualizados
+      setTimeout(() => fetchInvoices(), 1000);
       startPolling(invoice.id);
     } catch (err: any) {
       showToast(err.message, "error");
@@ -185,18 +212,15 @@ export default function StoreBillingScreen() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${SUPABASE_URL}/functions/v1/check-invoice-payment`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token ?? SUPABASE_KEY}`,
-            apikey: SUPABASE_KEY,
-          },
-          body: JSON.stringify({ invoice_id: invoiceId }),
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/store-billing`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? SUPABASE_KEY}`,
+          apikey: SUPABASE_KEY,
         },
-      );
+        body: JSON.stringify({ invoice_id: invoiceId }),
+      });
       const data = await res.json();
       if (data?.status === "paid") {
         clearInterval(pollingRef.current);
@@ -617,6 +641,26 @@ export default function StoreBillingScreen() {
                       : "🔄 Gerar novo QR Code"}
                   </button>
                   <button
+                    onClick={() => handleCheckout(inv)}
+                    disabled={!!generating}
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: 10,
+                      background: "#009ee3",
+                      color: "#fff",
+                      border: "none",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    {generating === inv.id + "_card"
+                      ? "⏳ Abrindo..."
+                      : "💳 Pagar com Cartão de Crédito"}
+                  </button>
+                  <button
                     onClick={async () => {
                       const data = await callBilling({
                         action: "check_payment",
@@ -671,28 +715,53 @@ export default function StoreBillingScreen() {
               {/* Botão gerar QR */}
               {inv.status !== "paid" && !inv.qr_code_base64 && (
                 <div style={{ padding: "0 16px 12px" }}>
-                  <button
-                    onClick={() => handleGenerateQR(inv)}
-                    disabled={generating === inv.id}
-                    style={{
-                      width: "100%",
-                      padding: "11px",
-                      borderRadius: 11,
-                      background:
-                        inv.status === "overdue" ? "#dc2626" : colors.rosa,
-                      color: "#fff",
-                      border: "none",
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: generating === inv.id ? "not-allowed" : "pointer",
-                      opacity: generating === inv.id ? 0.7 : 1,
-                      fontFamily: "'Space Grotesk', sans-serif",
-                    }}
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
                   >
-                    {generating === inv.id
-                      ? "⏳ Gerando..."
-                      : "⚡ Gerar QR Code para pagar"}
-                  </button>
+                    <button
+                      onClick={() => handleGenerateQR(inv)}
+                      disabled={!!generating}
+                      style={{
+                        width: "100%",
+                        padding: "11px",
+                        borderRadius: 11,
+                        background:
+                          inv.status === "overdue" ? "#dc2626" : colors.rosa,
+                        color: "#fff",
+                        border: "none",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: !!generating ? "not-allowed" : "pointer",
+                        opacity: !!generating ? 0.7 : 1,
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      {generating === inv.id
+                        ? "⏳ Gerando..."
+                        : "📱 Pagar com Pix"}
+                    </button>
+                    <button
+                      onClick={() => handleCheckout(inv)}
+                      disabled={!!generating}
+                      style={{
+                        width: "100%",
+                        padding: "11px",
+                        borderRadius: 11,
+                        background: "#009ee3",
+                        color: "#fff",
+                        border: "none",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: !!generating ? "not-allowed" : "pointer",
+                        opacity: !!generating ? 0.7 : 1,
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      {generating === inv.id + "_card"
+                        ? "⏳ Abrindo..."
+                        : "💳 Pagar com Cartão"}
+                    </button>
+                  </div>
                 </div>
               )}
 

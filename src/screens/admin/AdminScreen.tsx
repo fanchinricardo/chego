@@ -22,6 +22,15 @@ interface AdminConfig {
   mp_access_token: string | null;
 }
 
+interface FinancialStats {
+  receivedTotal: number; // faturas pagas no mês
+  pendingTotal: number; // faturas pendentes no mês
+  estimatedNext: number; // estimativa do próximo mês baseada nas vendas atuais
+  paidInvoices: number;
+  pendingInvoices: number;
+  totalSalesMonth: number; // total de vendas do mês em todos os comércios
+}
+
 interface Stats {
   totalStores: number;
   activeStores: number;
@@ -41,6 +50,14 @@ export default function AdminScreen() {
     activeStores: 0,
     totalCustomers: 0,
     totalMotoboys: 0,
+  });
+  const [financial, setFinancial] = useState<FinancialStats>({
+    receivedTotal: 0,
+    pendingTotal: 0,
+    estimatedNext: 0,
+    paidInvoices: 0,
+    pendingInvoices: 0,
+    totalSalesMonth: 0,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,7 +86,12 @@ export default function AdminScreen() {
 
   async function fetchAll() {
     setLoading(true);
-    await Promise.all([fetchStores(), fetchConfig(), fetchStats()]);
+    await Promise.all([
+      fetchStores(),
+      fetchConfig(),
+      fetchStats(),
+      fetchFinancial(),
+    ]);
     setLoading(false);
   }
 
@@ -92,6 +114,74 @@ export default function AdminScreen() {
       setDueDay(String(data.due_day));
       setMpToken(data.mp_access_token ?? "");
     }
+  }
+
+  async function fetchFinancial() {
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      .toISOString()
+      .slice(0, 10);
+
+    // Faturas pagas este mês
+    const { data: paid } = await supabase
+      .from("store_invoices")
+      .select("amount")
+      .eq("status", "paid")
+      .gte("paid_at", monthStart);
+
+    // Faturas pendentes/vencidas
+    const { data: pending } = await supabase
+      .from("store_invoices")
+      .select("amount")
+      .in("status", ["pending", "overdue"]);
+
+    // Total de vendas de todos os comércios no mês atual (para estimar próximo mês)
+    const { data: sales } = await supabase
+      .from("orders")
+      .select("total")
+      .not("status", "in", '("pending","cancelled")')
+      .gte("created_at", monthStart);
+
+    const { data: pdvSales } = await supabase
+      .from("pdv_orders")
+      .select("total")
+      .eq("status", "closed")
+      .gte("created_at", monthStart);
+
+    const { data: config } = await supabase
+      .from("admin_config")
+      .select("monthly_pct, signup_fee")
+      .single();
+
+    const pct = Number(config?.monthly_pct ?? 5) / 100;
+    const minFee = 9.9;
+
+    const receivedTotal = (paid ?? []).reduce(
+      (s, i) => s + Number(i.amount),
+      0,
+    );
+    const pendingTotal = (pending ?? []).reduce(
+      (s, i) => s + Number(i.amount),
+      0,
+    );
+    const totalSalesMonth = [
+      ...(sales ?? []).map((o) => Number(o.total)),
+      ...(pdvSales ?? []).map((o) => Number(o.total)),
+    ].reduce((s, v) => s + v, 0);
+
+    // Estimativa do próximo mês = vendas do mês atual * %
+    const estimatedNext = Math.max(totalSalesMonth * pct, minFee);
+
+    setFinancial({
+      receivedTotal,
+      pendingTotal,
+      estimatedNext,
+      paidInvoices: paid?.length ?? 0,
+      pendingInvoices: pending?.length ?? 0,
+      totalSalesMonth,
+    });
   }
 
   async function fetchStats() {
@@ -201,12 +291,84 @@ export default function AdminScreen() {
           Painel de administração
         </p>
 
+        {/* Cards Financeiros */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 8,
+            marginTop: 16,
+            marginBottom: 8,
+          }}
+        >
+          {[
+            {
+              label: "✅ Recebido no mês",
+              value: `R$ ${financial.receivedTotal.toFixed(2)}`,
+              color: "#22c55e",
+              sub: `${financial.paidInvoices} fatura(s)`,
+            },
+            {
+              label: "⏳ A receber",
+              value: `R$ ${financial.pendingTotal.toFixed(2)}`,
+              color: "#f59e0b",
+              sub: `${financial.pendingInvoices} pendente(s)`,
+            },
+            {
+              label: "📊 Estimativa próx. mês",
+              value: `R$ ${financial.estimatedNext.toFixed(2)}`,
+              color: "#60a5fa",
+              sub: `Vendas: R$ ${financial.totalSalesMonth.toFixed(0)}`,
+            },
+          ].map((c) => (
+            <div
+              key={c.label}
+              style={{
+                background: "rgba(255,255,255,0.07)",
+                borderRadius: 10,
+                padding: "10px 8px",
+                textAlign: "center",
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: "'Righteous', cursive",
+                  fontSize: 16,
+                  color: c.color,
+                  lineHeight: 1,
+                }}
+              >
+                {c.value}
+              </p>
+              <p
+                style={{
+                  fontSize: 8,
+                  color: "rgba(255,255,255,0.4)",
+                  marginTop: 4,
+                  lineHeight: 1.4,
+                }}
+              >
+                {c.label}
+              </p>
+              <p
+                style={{
+                  fontSize: 8,
+                  color: "rgba(255,255,255,0.25)",
+                  marginTop: 2,
+                }}
+              >
+                {c.sub}
+              </p>
+            </div>
+          ))}
+        </div>
+
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(4, 1fr)",
             gap: 8,
-            marginTop: 16,
+            marginTop: 4,
           }}
         >
           {[
