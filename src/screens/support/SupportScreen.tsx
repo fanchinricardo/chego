@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { colors, Spinner } from "../../components/ui";
 
-const ADMIN_ID = "53b9de49-da62-4964-a143-ada68bf774f9";
+const ADMIN_ID = "f892db9d-39a4-41ff-bef3-3c6460fa840d";
 
 interface Message {
   id: string;
@@ -17,6 +18,7 @@ interface Message {
 
 export default function SupportScreen() {
   const { profile, user } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = user?.id === ADMIN_ID;
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -27,6 +29,8 @@ export default function SupportScreen() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ending, setEnding] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const endRef = useRef<HTMLDivElement>(null);
   const conversaIdRef = useRef<string | null>(null);
@@ -59,7 +63,7 @@ export default function SupportScreen() {
   }, []);
 
   const pollConversas = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("support_conversations")
       .select(
         "id, status, criado_em, comercio_id, profiles:comercio_id(full_name)",
@@ -145,6 +149,67 @@ export default function SupportScreen() {
     });
     setText("");
     await poll();
+    // Notifica via WhatsApp
+    if (isAdmin) {
+      await notifySupport("admin_reply", text.trim());
+    } else if (messages.length === 0) {
+      // Primeira mensagem — notifica admin
+      await notifySupport("new_conversation", text.trim());
+    }
+  }
+
+  async function notifySupport(type: string, message: string) {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-support`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ type, conversa_id: conversaId, message }),
+        },
+      );
+    } catch (e) {
+      console.error("notify-support:", e);
+    }
+  }
+
+  async function sendFile(file: File) {
+    if (!conversaId || !user) return;
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const fileName = `support/${conversaId}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage
+        .from("support-files")
+        .upload(fileName, file);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage
+        .from("support-files")
+        .getPublicUrl(fileName);
+      const isImage = file.type.startsWith("image/");
+      const nome = isAdmin
+        ? "Suporte Chegô"
+        : (profile?.full_name ?? "Comércio");
+      await supabase.from("support_messages").insert({
+        conversa_id: conversaId,
+        remetente_id: user.id,
+        remetente_nome: nome,
+        mensagem: urlData.publicUrl,
+        tipo: isImage ? "imagem" : "arquivo",
+      });
+      await poll();
+    } catch (e: any) {
+      console.error("upload:", e);
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function endConversation() {
@@ -163,7 +228,13 @@ export default function SupportScreen() {
     });
     setStatus("encerrada");
     setEnding(false);
-    if (isAdmin) await pollConversas();
+    if (isAdmin) {
+      await pollConversas();
+      await notifySupport(
+        "conversation_ended",
+        "Seu atendimento foi encerrado pelo suporte.",
+      );
+    }
   }
 
   async function newConversation() {
@@ -301,15 +372,40 @@ export default function SupportScreen() {
                   boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
                 }}
               >
-                <p
-                  style={{
-                    fontSize: 13,
-                    lineHeight: 1.5,
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {msg.mensagem}
-                </p>
+                {msg.tipo === "imagem" ? (
+                  <img
+                    src={msg.mensagem}
+                    style={{
+                      maxWidth: "100%",
+                      borderRadius: 8,
+                      display: "block",
+                    }}
+                    loading="lazy"
+                  />
+                ) : msg.tipo === "arquivo" ? (
+                  <a
+                    href={msg.mensagem}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      color: isMe ? "#fff" : colors.rosa,
+                      fontSize: 13,
+                      textDecoration: "underline",
+                    }}
+                  >
+                    📎 {msg.mensagem.split("/").pop()}
+                  </a>
+                ) : (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {msg.mensagem}
+                  </p>
+                )}
                 <p
                   style={{
                     fontSize: 10,
@@ -385,6 +481,35 @@ export default function SupportScreen() {
         }}
       >
         <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,.pdf,.doc,.docx"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) sendFile(f);
+            e.target.value = "";
+          }}
+        />
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: "50%",
+            background: colors.lilasClaro,
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          {uploading ? "⏳" : "📎"}
+        </button>
+        <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -459,6 +584,20 @@ export default function SupportScreen() {
             flexShrink: 0,
           }}
         >
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "rgba(255,255,255,0.6)",
+              fontSize: 20,
+              padding: "0 4px",
+              flexShrink: 0,
+            }}
+          >
+            ←
+          </button>
           <div
             style={{
               width: 36,
