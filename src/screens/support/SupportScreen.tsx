@@ -15,13 +15,6 @@ interface Message {
   created_at: string;
 }
 
-interface Conversa {
-  id: string;
-  status: string;
-  criado_em: string;
-  comercio_id: string;
-}
-
 export default function SupportScreen() {
   const { profile, user } = useAuth();
   const isAdmin = user?.id === ADMIN_ID;
@@ -30,7 +23,7 @@ export default function SupportScreen() {
   const [text, setText] = useState("");
   const [conversaId, setConversaId] = useState<string | null>(null);
   const [status, setStatus] = useState<"aberta" | "encerrada">("aberta");
-  const [conversas, setConversas] = useState<Conversa[]>([]);
+  const [conversas, setConversas] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ending, setEnding] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -72,7 +65,7 @@ export default function SupportScreen() {
         "id, status, criado_em, comercio_id, profiles:comercio_id(full_name)",
       )
       .order("criado_em", { ascending: false });
-    if (data) setConversas(data as any[]);
+    if (data) setConversas(data);
   }, []);
 
   useEffect(() => {
@@ -88,8 +81,7 @@ export default function SupportScreen() {
   }, [isAdmin, pollConversas]);
 
   useEffect(() => {
-    if (!user) return;
-    init();
+    if (user) init();
   }, [user]);
 
   async function init() {
@@ -109,19 +101,19 @@ export default function SupportScreen() {
 
   async function getOrCreateConversa() {
     if (!user) return null;
-    const { data: existing } = await supabase
+    const { data: ex } = await supabase
       .from("support_conversations")
       .select("*")
       .eq("comercio_id", user.id)
       .eq("status", "aberta")
       .maybeSingle();
-    if (existing) return existing;
-    const { data: nova } = await supabase
+    if (ex) return ex;
+    const { data } = await supabase
       .from("support_conversations")
       .insert({ comercio_id: user.id, status: "aberta" })
       .select()
       .single();
-    return nova;
+    return data;
   }
 
   async function loadMessages(id: string) {
@@ -166,7 +158,7 @@ export default function SupportScreen() {
       conversa_id: conversaId,
       remetente_id: user!.id,
       remetente_nome: "Sistema",
-      mensagem: "✅ Atendimento encerrado pelo suporte.",
+      mensagem: "✅ Atendimento encerrado.",
       tipo: "sistema",
     });
     setStatus("encerrada");
@@ -188,25 +180,27 @@ export default function SupportScreen() {
     }
   }
 
-  function fmtDate(d: string | null | undefined) {
-    if (!d) return "";
-    const date = new Date(d.endsWith("Z") ? d : d + "Z");
-    if (isNaN(date.getTime())) return "";
-    const hoje = new Date();
-    const mesmodia = date.toDateString() === hoje.toDateString();
-    return mesmodia
-      ? date.toLocaleTimeString("pt-BR", {
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: "America/Sao_Paulo",
-        })
-      : date.toLocaleString("pt-BR", {
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: "America/Sao_Paulo",
-        });
+  function fmtDate(d: string) {
+    try {
+      const date = new Date(d.endsWith("Z") ? d : d + "Z");
+      if (isNaN(date.getTime())) return "";
+      const hoje = new Date();
+      return date.toDateString() === hoje.toDateString()
+        ? date.toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "America/Sao_Paulo",
+          })
+        : date.toLocaleString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "America/Sao_Paulo",
+          });
+    } catch {
+      return "";
+    }
   }
 
   function nomeDaConversa(conv: any) {
@@ -232,8 +226,8 @@ export default function SupportScreen() {
       </div>
     );
 
-  // JSX de mensagens
-  const messagesJSX = (
+  // Mensagens
+  const renderMessages = () => (
     <div
       style={{
         flex: 1,
@@ -250,7 +244,7 @@ export default function SupportScreen() {
         >
           <p style={{ fontSize: 32, marginBottom: 8 }}>👋</p>
           <p style={{ fontSize: 14, fontWeight: 600, color: colors.noite }}>
-            Olá! Como podemos ajudar?
+            Como podemos ajudar?
           </p>
           <p style={{ fontSize: 12, marginTop: 4 }}>
             Envie sua mensagem e responderemos em breve.
@@ -335,47 +329,50 @@ export default function SupportScreen() {
     </div>
   );
 
-  function renderInput() {
-    return isEncerrada ? (
-      <div
-        style={{
-          background: "#fff",
-          borderTop: "1px solid #eee",
-          padding: "14px 16px",
-          textAlign: "center",
-          flexShrink: 0,
-        }}
-      >
-        <p
+  // Input
+  const renderInput = () => {
+    if (isEncerrada)
+      return (
+        <div
           style={{
-            fontSize: 13,
-            color: "#888",
-            marginBottom: isAdmin ? 0 : 10,
+            background: "#fff",
+            borderTop: "1px solid #eee",
+            padding: "14px 16px",
+            textAlign: "center",
+            flexShrink: 0,
           }}
         >
-          Atendimento encerrado.
-        </p>
-        {!isAdmin && (
-          <button
-            onClick={newConversation}
+          <p
             style={{
-              background: "#22c55e",
-              color: "#fff",
-              border: "none",
-              borderRadius: 20,
-              padding: "8px 20px",
               fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "'Space Grotesk', sans-serif",
-              marginTop: 8,
+              color: "#888",
+              marginBottom: isAdmin ? 0 : 10,
             }}
           >
-            Abrir novo atendimento
-          </button>
-        )}
-      </div>
-    ) : (
+            Atendimento encerrado.
+          </p>
+          {!isAdmin && (
+            <button
+              onClick={newConversation}
+              style={{
+                background: "#22c55e",
+                color: "#fff",
+                border: "none",
+                borderRadius: 20,
+                padding: "8px 20px",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk', sans-serif",
+                marginTop: 8,
+              }}
+            >
+              Abrir novo atendimento
+            </button>
+          )}
+        </div>
+      );
+    return (
       <div
         style={{
           background: "#fff",
@@ -390,7 +387,12 @@ export default function SupportScreen() {
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
           placeholder="Digite sua mensagem..."
           style={{
             flex: 1,
@@ -433,14 +435,9 @@ export default function SupportScreen() {
         </button>
       </div>
     );
-  }
-  {
-    messagesJSX;
-  }
-  {
-    conversaId && { renderInput };
-  }
-  // ── RENDER COMÉRCIO ─────────────────────────────────────────────────────────
+  };
+
+  // ── COMÉRCIO ────────────────────────────────────────────────────────────────
   if (!isAdmin)
     return (
       <div
@@ -501,10 +498,12 @@ export default function SupportScreen() {
             </div>
           </div>
         </div>
+        {renderMessages()}
+        {conversaId && renderInput()}
       </div>
     );
 
-  // ── RENDER ADMIN ────────────────────────────────────────────────────────────
+  // ── ADMIN ───────────────────────────────────────────────────────────────────
   return (
     <div
       style={{
@@ -551,6 +550,7 @@ export default function SupportScreen() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            flexShrink: 0,
           }}
         >
           <p style={{ fontSize: 14, fontWeight: 700, color: colors.noite }}>
@@ -825,7 +825,7 @@ export default function SupportScreen() {
           </div>
         ) : (
           <>
-            {messagesJSX}
+            {renderMessages()}
             {renderInput()}
           </>
         )}
