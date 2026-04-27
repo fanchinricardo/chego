@@ -188,8 +188,10 @@ export default function SupportScreen() {
     }
   }
 
-  function fmtDate(d: string) {
+  function fmtDate(d: string | null | undefined) {
+    if (!d) return "";
     const date = new Date(d.endsWith("Z") ? d : d + "Z");
+    if (isNaN(date.getTime())) return "";
     const hoje = new Date();
     const mesmodia = date.toDateString() === hoje.toDateString();
     return mesmodia
@@ -230,8 +232,8 @@ export default function SupportScreen() {
       </div>
     );
 
-  // Componente de mensagens reutilizável
-  const Messages = () => (
+  // JSX de mensagens
+  const messagesJSX = (
     <div
       style={{
         flex: 1,
@@ -333,105 +335,99 @@ export default function SupportScreen() {
     </div>
   );
 
-  // Input reutilizável
-  const Input = () =>
-    isEncerrada ? (
-      <div
-        style={{
-          background: "#fff",
-          borderTop: "1px solid #eee",
-          padding: "14px 16px",
-          textAlign: "center",
-          flexShrink: 0,
-        }}
+  const inputJSX = isEncerrada ? (
+    <div
+      style={{
+        background: "#fff",
+        borderTop: "1px solid #eee",
+        padding: "14px 16px",
+        textAlign: "center",
+        flexShrink: 0,
+      }}
+    >
+      <p
+        style={{ fontSize: 13, color: "#888", marginBottom: isAdmin ? 0 : 10 }}
       >
-        <p
-          style={{
-            fontSize: 13,
-            color: "#888",
-            marginBottom: isAdmin ? 0 : 10,
-          }}
-        >
-          Atendimento encerrado.
-        </p>
-        {!isAdmin && (
-          <button
-            onClick={newConversation}
-            style={{
-              background: "#22c55e",
-              color: "#fff",
-              border: "none",
-              borderRadius: 20,
-              padding: "8px 20px",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "'Space Grotesk', sans-serif",
-              marginTop: 8,
-            }}
-          >
-            Abrir novo atendimento
-          </button>
-        )}
-      </div>
-    ) : (
-      <div
-        style={{
-          background: "#fff",
-          borderTop: "1px solid #eee",
-          padding: "10px 12px",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          flexShrink: 0,
-        }}
-      >
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-          placeholder="Digite sua mensagem..."
-          style={{
-            flex: 1,
-            border: `1.5px solid ${colors.bordaLilas}`,
-            borderRadius: 20,
-            padding: "10px 16px",
-            fontSize: 13,
-            outline: "none",
-            fontFamily: "'Space Grotesk', sans-serif",
-          }}
-        />
+        Atendimento encerrado.
+      </p>
+      {!isAdmin && (
         <button
-          onClick={sendMessage}
-          disabled={!text.trim()}
+          onClick={newConversation}
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: "50%",
-            background: text.trim() ? colors.rosa : "#ddd",
+            background: "#22c55e",
             color: "#fff",
             border: "none",
-            cursor: text.trim() ? "pointer" : "default",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
+            borderRadius: 20,
+            padding: "8px 20px",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "'Space Grotesk', sans-serif",
+            marginTop: 8,
           }}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
+          Abrir novo atendimento
         </button>
-      </div>
-    );
+      )}
+    </div>
+  ) : (
+    <div
+      style={{
+        background: "#fff",
+        borderTop: "1px solid #eee",
+        padding: "10px 12px",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexShrink: 0,
+      }}
+    >
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+        placeholder="Digite sua mensagem..."
+        style={{
+          flex: 1,
+          border: `1.5px solid ${colors.bordaLilas}`,
+          borderRadius: 20,
+          padding: "10px 16px",
+          fontSize: 13,
+          outline: "none",
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      />
+      <button
+        onClick={sendMessage}
+        disabled={!text.trim()}
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: "50%",
+          background: text.trim() ? colors.rosa : "#ddd",
+          color: "#fff",
+          border: "none",
+          cursor: text.trim() ? "pointer" : "default",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        >
+          <line x1="22" y1="2" x2="11" y2="13" />
+          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+        </svg>
+      </button>
+    </div>
+  );
 
   // ── RENDER COMÉRCIO ─────────────────────────────────────────────────────────
   if (!isAdmin)
@@ -494,8 +490,8 @@ export default function SupportScreen() {
             </div>
           </div>
         </div>
-        <Messages />
-        {conversaId && <Input />}
+        {messagesJSX}
+        {conversaId && { inputJSX }}
       </div>
     );
 
@@ -820,8 +816,8 @@ export default function SupportScreen() {
           </div>
         ) : (
           <>
-            <Messages />
-            <Input />
+            {messagesJSX}
+            {inputJSX}
           </>
         )}
       </div>

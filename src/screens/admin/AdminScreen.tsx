@@ -270,22 +270,40 @@ export default function AdminScreen() {
           >
             Cheg<span style={{ color: colors.rosa }}>ô</span> Admin
           </p>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: "rgba(255,255,255,0.1)",
-              border: "none",
-              borderRadius: 8,
-              padding: "6px 14px",
-              color: "rgba(255,255,255,0.7)",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}
-          >
-            Sair →
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={() => (window.location.href = "/support")}
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                border: "none",
+                borderRadius: 8,
+                padding: "6px 14px",
+                color: "rgba(255,255,255,0.7)",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              🎧 Suporte
+            </button>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                border: "none",
+                borderRadius: 8,
+                padding: "6px 14px",
+                color: "rgba(255,255,255,0.7)",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              Sair →
+            </button>
+          </div>
         </div>
         <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
           Painel de administração
