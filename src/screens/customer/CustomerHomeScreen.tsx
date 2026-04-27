@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCart } from "../../contexts/CartContext";
@@ -8,6 +8,7 @@ import {
   StorePublic,
 } from "../../hooks/useCustomer";
 import { colors, Logo, Spinner } from "../../components/ui";
+import { supabase } from "../../lib/supabase";
 import { CustomerBottomNav } from "./CustomerBottomNav";
 
 export default function CustomerHomeScreen() {
@@ -20,6 +21,19 @@ export default function CustomerHomeScreen() {
   );
   const [search, setSearch] = useState("");
   const [searchActive, setSearchActive] = useState(false);
+
+  const [promoStores, setPromoStores] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    supabase
+      .from("promotions")
+      .select("store_id")
+      .eq("active", true)
+      .gt("valid_until", new Date().toISOString())
+      .then(({ data }) => {
+        setPromoStores(new Set((data ?? []).map((p: any) => p.store_id)));
+      });
+  }, []);
 
   const { groups } = useStoreGroups();
   const { stores, loading } = useCustomerStores(
@@ -264,6 +278,7 @@ export default function CustomerHomeScreen() {
                       key={s.id}
                       store={s}
                       onPress={() => navigate(`/loja/${s.id}`)}
+                      hasPromo={promoStores.has(s.id)}
                     />
                   ))}
                 </div>
@@ -293,6 +308,7 @@ export default function CustomerHomeScreen() {
                       store={s}
                       onPress={() => navigate(`/loja/${s.id}`)}
                       closed
+                      hasPromo={promoStores.has(s.id)}
                     />
                   ))}
                 </div>
@@ -417,10 +433,12 @@ function StoreCard({
   store,
   onPress,
   closed,
+  hasPromo,
 }: {
   store: StorePublic;
   onPress: () => void;
   closed?: boolean;
+  hasPromo?: boolean;
 }) {
   return (
     <div
@@ -428,11 +446,16 @@ function StoreCard({
       style={{
         background: "#fff",
         borderRadius: 16,
-        border: `1px solid ${colors.bordaLilas}`,
+        border: `2px solid ${hasPromo && !closed ? "#ff1493" : colors.bordaLilas}`,
         overflow: "hidden",
         cursor: closed ? "default" : "pointer",
         opacity: closed ? 0.55 : 1,
-        boxShadow: closed ? "none" : "0 2px 12px rgba(28,10,46,0.07)",
+        boxShadow:
+          hasPromo && !closed
+            ? "0 4px 20px rgba(255,20,147,0.2)"
+            : closed
+              ? "none"
+              : "0 2px 12px rgba(28,10,46,0.07)",
       }}
     >
       {/* Banner */}
@@ -479,6 +502,24 @@ function StoreCard({
             }}
           >
             Aberto
+          </span>
+        )}
+        {hasPromo && (
+          <span
+            style={{
+              position: "absolute",
+              top: 10,
+              left: 12,
+              background: "#ff1493",
+              color: "#fff",
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "3px 9px",
+              borderRadius: 8,
+              animation: "none",
+            }}
+          >
+            🎉 PROMOÇÃO
           </span>
         )}
         {closed && (

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { supabase } from "../../lib/supabase";
 import { useNavigate, useParams } from "react-router-dom";
 import { useStoreDetail, useStoreProducts } from "../../hooks/useCustomer";
 import { useCart } from "../../contexts/CartContext";
@@ -22,6 +23,7 @@ export default function CustomerStoreScreen() {
 
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [promotions, setPromotions] = useState<any[]>([]);
   const [productQty, setProductQty] = useState(1);
   const [productNotes, setProductNotes] = useState("");
   const [toast, setToast] = useState("");
@@ -30,6 +32,19 @@ export default function CustomerStoreScreen() {
   const [pendingProduct, setPendingProduct] = useState<any | null>(null);
   const [productSizes, setProductSizes] = useState<Record<string, any[]>>({});
 
+  // Busca promoções ativas da loja
+  useEffect(() => {
+    if (!id) return;
+    supabase
+      .from("promotions")
+      .select("*")
+      .eq("store_id", id)
+      .eq("active", true)
+      .gt("valid_until", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setPromotions(data ?? []));
+  }, [id]);
+
   function showToast(msg: string, type: "success" | "error" = "success") {
     setToast(msg);
     setToastType(type);
@@ -37,7 +52,10 @@ export default function CustomerStoreScreen() {
   }
 
   function openProduct(product: any) {
-   
+    console.log("🍕 openProduct chamado:", product.name, {
+      allows_half: product.allows_half,
+      size_type: product.size_type,
+    });
     setSelectedProduct(product);
     setProductQty(1);
     setProductNotes("");
@@ -322,6 +340,91 @@ export default function CustomerStoreScreen() {
         </div>
       ) : (
         <div style={{ maxWidth: 520, margin: "0 auto", padding: "12px 16px" }}>
+          {/* Banner de promoções */}
+          {promotions.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              {promotions.map((promo) => (
+                <div
+                  key={promo.id}
+                  style={{
+                    background: "linear-gradient(135deg, #e9181c, #ff69b4)",
+                    borderRadius: 14,
+                    padding: "14px 16px",
+                    marginBottom: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ fontSize: 28, flexShrink: 0 }}>🎉</div>
+                  <div style={{ flex: 1 }}>
+                    <p
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: "#fff",
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {promo.title}
+                    </p>
+                    {promo.description && (
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(255,255,255,0.85)",
+                          marginTop: 3,
+                        }}
+                      >
+                        {promo.description}
+                      </p>
+                    )}
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "rgba(255,255,255,0.7)",
+                        marginTop: 4,
+                      }}
+                    >
+                      ⏰ Até{" "}
+                      {new Date(promo.valid_until).toLocaleDateString("pt-BR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                      })}{" "}
+                      às{" "}
+                      {new Date(promo.valid_until).toLocaleTimeString("pt-BR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                  {promo.discount && (
+                    <div
+                      style={{
+                        background: "#fff",
+                        borderRadius: 10,
+                        padding: "6px 10px",
+                        textAlign: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontFamily: "'Righteous', cursive",
+                          fontSize: 18,
+                          color: "#e9181c",
+                          lineHeight: 1,
+                        }}
+                      >
+                        -{promo.discount}%
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {Object.entries(groupedProducts).map(([cat, prods]) => (
             <div key={cat} style={{ marginBottom: 20 }}>
               <p

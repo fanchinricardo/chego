@@ -33,7 +33,9 @@ import StoreWaiterScreen from "./screens/store/StoreWaiterScreen";
 import StoreKitchenScreen from "./screens/store/StoreKitchenScreen";
 import TablePublicScreen from "./screens/table/TablePublicScreen";
 import CashierTablesScreen from "./screens/cashier/CashierTablesScreen";
-import CashierPDVScreen from "./screens/cashier/CashierPdvScreen";
+import StorePromotionsScreen from "./screens/store/StorePromotionsScreen";
+import StoreRevenueScreen from "./screens/store/StoreRevenueScreen";
+import CashierPDVScreen from "./screens/cashier/CashierPDVScreen";
 import KitchenScreen from "./screens/kitchen/KitchenScreen";
 import WaiterBillScreen from "./screens/waiter/WaiterBillScreen";
 import WaiterTablesScreen from "./screens/waiter/WaiterTablesScreen";
@@ -362,6 +364,22 @@ export default function App() {
               element={
                 <PrivateRoute allowedRoles={["store"]}>
                   <CashierTablesScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/store/promotions"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <StorePromotionsScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/store/revenue"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <StoreRevenueScreen />
                 </PrivateRoute>
               }
             />

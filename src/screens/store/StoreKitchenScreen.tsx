@@ -32,6 +32,7 @@ export default function StoreKitchenScreen() {
     password: "",
     categories: [] as string[],
   });
+  const [editingId, setEditingId] = useState<string | null>(null);
   const { categories } = useProducts(store?.id ?? null);
 
   function showToast(msg: string, type: "success" | "error" = "success") {
@@ -141,7 +142,7 @@ export default function StoreKitchenScreen() {
             style={{
               background: "none",
               border: "none",
-              color: "rgba(255,255,255,0.35)",
+              color: "#fff",
               fontSize: 13,
               cursor: "pointer",
               marginBottom: 10,

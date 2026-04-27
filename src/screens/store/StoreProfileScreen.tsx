@@ -334,6 +334,8 @@ export default function StoreProfileScreen() {
               },
               { icon: "🪑", label: "Mesas", path: "/store/tables" },
               { icon: "🖥️", label: "Caixa", path: "/cashier" },
+              { icon: "📊", label: "Faturamento", path: "/store/revenue" },
+              { icon: "🎉", label: "Promoções", path: "/store/promotions" },
               { icon: "🧑‍🍳", label: "Garçons", path: "/store/waiters" },
               { icon: "👨‍🍳", label: "Cozinha", path: "/store/kitchen" },
               {
