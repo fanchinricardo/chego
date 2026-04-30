@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../../lib/supabase";
 import { useStore } from "../../hooks/useStore";
 import { useAuth } from "../../contexts/AuthContext";
 import { colors, Input, Button, Spinner, Toast } from "../../components/ui";
@@ -10,6 +11,31 @@ export default function StoreProfileScreen() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const { store, loading, updateStore } = useStore();
+
+  useEffect(() => {
+    if (!store?.id) return;
+    const checkOverdue = async () => {
+      const { data } = await supabase
+        .from("store_invoices")
+        .select("id, due_date")
+        .eq("store_id", store.id)
+        .eq("status", "pending");
+      const now = new Date();
+      for (const inv of data ?? []) {
+        if (new Date(inv.due_date + "T23:59:59") < now) {
+          await supabase
+            .from("store_invoices")
+            .update({ status: "overdue" })
+            .eq("id", inv.id);
+          await supabase
+            .from("stores")
+            .update({ active: false })
+            .eq("id", store.id);
+        }
+      }
+    };
+    checkOverdue();
+  }, [store?.id]);
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);

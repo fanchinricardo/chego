@@ -51,31 +51,36 @@ export default function StoreBillingScreen() {
     return () => clearInterval(pollingRef.current);
   }, [store]);
 
-  // Polling automático para faturas pendentes com QR Code gerado
+  // Polling automático — verifica a cada 5s faturas pendentes com payment_id
   useEffect(() => {
     const pending = invoices.filter(
-      (i) =>
-        (i.status === "pending" || i.status === "overdue") && i.qr_code_base64,
+      (i) => (i.status === "pending" || i.status === "overdue") && i.payment_id,
     );
-    if (pending.length === 0) return;
-
+    if (pending.length === 0) {
+      clearInterval(pollingRef.current);
+      return;
+    }
     clearInterval(pollingRef.current);
     pollingRef.current = setInterval(async () => {
       for (const inv of pending) {
         await checkPayment(inv.id);
       }
     }, 5000);
-
     return () => clearInterval(pollingRef.current);
-  }, [invoices]);
+  }, [invoices.map((i) => i.id + i.status + i.payment_id).join(",")]);
 
   async function fetchNextInvoice() {
     if (!store) return;
-    // Busca config do admin
-    const { data: config } = await supabase
-      .from("admin_config")
-      .select("monthly_pct, due_day")
-      .single();
+
+    // Busca config do admin E taxas customizadas da loja
+    const [{ data: config }, { data: storeData }] = await Promise.all([
+      supabase.from("admin_config").select("monthly_pct, due_day").single(),
+      supabase
+        .from("stores")
+        .select("billing_type, custom_monthly_fee, custom_monthly_pct")
+        .eq("id", store.id)
+        .single(),
+    ]);
     if (!config) return;
 
     // Calcula vendas do mês atual
@@ -89,14 +94,41 @@ export default function StoreBillingScreen() {
       .neq("status", "pending")
       .gte("created_at", monthStart);
 
-    const salesTotal = (orders ?? []).reduce((s, o) => s + Number(o.total), 0);
-    const amount = Math.max((salesTotal * config.monthly_pct) / 100, 9.9);
+    const { data: pdvOrders } = await supabase
+      .from("pdv_orders")
+      .select("total")
+      .eq("store_id", store.id)
+      .eq("status", "closed")
+      .gte("created_at", monthStart);
+
+    const salesTotal = [
+      ...(orders ?? []).map((o) => Number(o.total)),
+      ...(pdvOrders ?? []).map((o) => Number(o.total)),
+    ].reduce((s, v) => s + v, 0);
+
+    // Usa taxas customizadas se existirem
+    const billingType = storeData?.billing_type ?? "pct";
+    const customFixed = storeData?.custom_monthly_fee;
+    const customPct = storeData?.custom_monthly_pct;
+
+    let amount: number;
+    let pct: number;
+
+    if (billingType === "fixed" && customFixed) {
+      amount = Number(customFixed);
+      pct = 0;
+    } else {
+      pct = customPct ? Number(customPct) : config.monthly_pct;
+      amount = Math.max((salesTotal * pct) / 100, 9.9);
+    }
 
     setNextInvoice({
       amount,
-      pct: config.monthly_pct,
+      pct,
       salesTotal,
       dueDay: config.due_day,
+      billingType,
+      customFixed: customFixed ? Number(customFixed) : null,
     });
   }
 
@@ -108,14 +140,25 @@ export default function StoreBillingScreen() {
       .select("*")
       .eq("store_id", store.id)
       .order("created_at", { ascending: false });
-    console.log(
-      "[Billing] invoices:",
-      data?.map((i) => ({
-        id: i.id,
-        qr: !!i.qr_code_base64,
-        status: i.status,
-      })),
-    );
+    // Marca como overdue e bloqueia loja se passou do vencimento
+    const now = new Date();
+    for (const inv of data ?? []) {
+      if (
+        inv.status === "pending" &&
+        new Date(inv.due_date + "T23:59:59") < now
+      ) {
+        await supabase
+          .from("store_invoices")
+          .update({ status: "overdue" })
+          .eq("id", inv.id);
+        inv.status = "overdue";
+        await supabase
+          .from("stores")
+          .update({ active: false })
+          .eq("id", store.id);
+      }
+    }
+
     setInvoices((data ?? []) as Invoice[]);
     setLoading(false);
   }
@@ -207,6 +250,7 @@ export default function StoreBillingScreen() {
   }
 
   async function checkPayment(invoiceId: string) {
+    if (!store) return;
     try {
       // Verifica status direto no MP via Edge Function
       const {
@@ -219,13 +263,24 @@ export default function StoreBillingScreen() {
           Authorization: `Bearer ${session?.access_token ?? SUPABASE_KEY}`,
           apikey: SUPABASE_KEY,
         },
-        body: JSON.stringify({ invoice_id: invoiceId }),
+        body: JSON.stringify({
+          action: "check_payment",
+          invoice_id: invoiceId,
+          store_id: store?.id ?? "",
+        }),
       });
       const data = await res.json();
-      if (data?.status === "paid") {
+
+      if (data?.paid === true) {
         clearInterval(pollingRef.current);
+        if (store?.id) {
+          await supabase
+            .from("stores")
+            .update({ active: true })
+            .eq("id", store.id);
+        }
         showToast("✅ Pagamento confirmado! Loja ativada!");
-        fetchInvoices();
+        await fetchInvoices();
       }
     } catch (err) {
       console.warn("Erro ao verificar pagamento:", err);

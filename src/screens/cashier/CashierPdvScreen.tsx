@@ -18,6 +18,19 @@ const METHOD_LABEL: Record<string, string> = {
 
 export default function CashierPDVScreen() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!store?.id) return;
+    supabase
+      .from("store_invoices")
+      .select("id")
+      .eq("store_id", store.id)
+      .eq("status", "overdue")
+      .then(({ data }) => {
+        if ((data?.length ?? 0) > 0)
+          navigate("/store/billing", { replace: true });
+      });
+  }, [store?.id]);
   const { store } = useStore();
   const { profile } = useAuth();
   const storeId = store?.id ?? null;
@@ -341,7 +354,7 @@ export default function CashierPDVScreen() {
               border: "1px solid rgba(255,255,255,0.15)",
               borderRadius: 10,
               padding: "8px 14px",
-              color: "#fff",
+              color: "rgba(255,255,255,0.6)",
               fontSize: 12,
               cursor: "pointer",
               fontFamily: "'Space Grotesk', sans-serif",

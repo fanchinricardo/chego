@@ -43,6 +43,9 @@ type Tab = "stores" | "config";
 export default function AdminScreen() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("stores");
+  const [editingStore, setEditingStore] = useState<string | null>(null);
+  const [customFees, setCustomFees] = useState<Record<string, any>>({});
+  const [savingFees, setSavingFees] = useState(false);
   const [stores, setStores] = useState<Store[]>([]);
   const [config, setConfig] = useState<AdminConfig | null>(null);
   const [stats, setStats] = useState<Stats>({
@@ -99,7 +102,7 @@ export default function AdminScreen() {
     const { data } = await supabase
       .from("stores")
       .select(
-        "id, name, active, signup_paid, open_now, created_at, owner_id, profiles!owner_id(full_name, phone)",
+        "id, name, active, signup_paid, open_now, created_at, owner_id, billing_type, custom_signup_fee, custom_monthly_fee, custom_monthly_pct, profiles!owner_id(full_name, phone)",
       )
       .order("created_at", { ascending: false });
     setStores((data ?? []) as Store[]);
@@ -140,13 +143,13 @@ export default function AdminScreen() {
     // Total de vendas de todos os comércios no mês atual (para estimar próximo mês)
     const { data: sales } = await supabase
       .from("orders")
-      .select("total")
+      .select("total, store_id")
       .not("status", "in", '("pending","cancelled")')
       .gte("created_at", monthStart);
 
     const { data: pdvSales } = await supabase
       .from("pdv_orders")
-      .select("total")
+      .select("total, store_id")
       .eq("status", "closed")
       .gte("created_at", monthStart);
 
@@ -155,7 +158,7 @@ export default function AdminScreen() {
       .select("monthly_pct, signup_fee")
       .single();
 
-    const pct = Number(config?.monthly_pct ?? 5) / 100;
+    const defaultPct = Number(config?.monthly_pct ?? 5) / 100;
     const minFee = 9.9;
 
     const receivedTotal = (paid ?? []).reduce(
@@ -171,8 +174,32 @@ export default function AdminScreen() {
       ...(pdvSales ?? []).map((o) => Number(o.total)),
     ].reduce((s, v) => s + v, 0);
 
-    // Estimativa do próximo mês = vendas do mês atual * %
-    const estimatedNext = Math.max(totalSalesMonth * pct, minFee);
+    // Busca taxas customizadas de cada loja
+    const { data: allStores } = await supabase
+      .from("stores")
+      .select("id, billing_type, custom_monthly_fee, custom_monthly_pct")
+      .eq("active", true);
+
+    // Mapa de vendas por loja
+    const salesByStore: Record<string, number> = {};
+    for (const o of [...(sales ?? []), ...(pdvSales ?? [])]) {
+      const sid = (o as any).store_id;
+      if (sid) salesByStore[sid] = (salesByStore[sid] ?? 0) + Number(o.total);
+    }
+
+    // Estimativa total somando por loja
+    let estimatedNext = 0;
+    for (const store of allStores ?? []) {
+      const storeSales = salesByStore[store.id] ?? 0;
+      if (store.billing_type === "fixed" && store.custom_monthly_fee) {
+        estimatedNext += Number(store.custom_monthly_fee);
+      } else {
+        const pct = store.custom_monthly_pct
+          ? Number(store.custom_monthly_pct) / 100
+          : defaultPct;
+        estimatedNext += Math.max(storeSales * pct, minFee);
+      }
+    }
 
     setFinancial({
       receivedTotal,
@@ -231,6 +258,42 @@ export default function AdminScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleSaveCustomFees(storeId: string) {
+    setSavingFees(true);
+    const fees = customFees[storeId] ?? {};
+    await supabase
+      .from("stores")
+      .update({
+        billing_type: fees.billing_type ?? "pct",
+        custom_signup_fee: fees.custom_signup_fee
+          ? Number(fees.custom_signup_fee)
+          : null,
+        custom_monthly_fee: fees.custom_monthly_fee
+          ? Number(fees.custom_monthly_fee)
+          : null,
+        custom_monthly_pct: fees.custom_monthly_pct
+          ? Number(fees.custom_monthly_pct)
+          : null,
+      })
+      .eq("id", storeId);
+    setSavingFees(false);
+    setEditingStore(null);
+    await fetchStores();
+  }
+
+  function initCustomFees(s: Store) {
+    setCustomFees((prev) => ({
+      ...prev,
+      [s.id]: {
+        billing_type: (s as any).billing_type ?? "pct",
+        custom_signup_fee: (s as any).custom_signup_fee ?? "",
+        custom_monthly_fee: (s as any).custom_monthly_fee ?? "",
+        custom_monthly_pct: (s as any).custom_monthly_pct ?? "",
+      },
+    }));
+    setEditingStore(s.id);
   }
 
   async function handleToggleStore(store: Store) {
@@ -573,6 +636,36 @@ export default function AdminScreen() {
                             Cadastro:{" "}
                             {new Date(s.created_at).toLocaleDateString("pt-BR")}
                           </p>
+                          {(s as any).billing_type === "fixed" &&
+                            (s as any).custom_monthly_fee && (
+                              <p
+                                style={{
+                                  fontSize: 10,
+                                  color: "#7e22ce",
+                                  fontWeight: 600,
+                                  marginTop: 2,
+                                }}
+                              >
+                                💜 Fixo: R${" "}
+                                {Number((s as any).custom_monthly_fee).toFixed(
+                                  2,
+                                )}
+                                /mês
+                              </p>
+                            )}
+                          {(s as any).billing_type !== "fixed" &&
+                            (s as any).custom_monthly_pct && (
+                              <p
+                                style={{
+                                  fontSize: 10,
+                                  color: "#7e22ce",
+                                  fontWeight: 600,
+                                  marginTop: 2,
+                                }}
+                              >
+                                💜 {(s as any).custom_monthly_pct}% customizado
+                              </p>
+                            )}
                         </div>
                         <div
                           style={{
@@ -609,8 +702,316 @@ export default function AdminScreen() {
                               ? "✓ Adesão paga"
                               : "⏳ Adesão pendente"}
                           </span>
+                          <button
+                            onClick={() =>
+                              editingStore === s.id
+                                ? setEditingStore(null)
+                                : initCustomFees(s)
+                            }
+                            style={{
+                              padding: "4px 10px",
+                              borderRadius: 8,
+                              border: `1px solid ${colors.bordaLilas}`,
+                              background:
+                                editingStore === s.id
+                                  ? colors.lilasClaro
+                                  : "#fff",
+                              color: "#7e22ce",
+                              fontSize: 10,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            ⚙️ Taxas
+                          </button>
                         </div>
                       </div>
+
+                      {/* Painel de taxas customizadas */}
+                      {editingStore === s.id && (
+                        <div
+                          style={{
+                            borderTop: `1px solid ${colors.bordaLilas}`,
+                            padding: "12px 14px",
+                            background: colors.fundo,
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#aaa",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.08em",
+                              marginBottom: 10,
+                            }}
+                          >
+                            Taxas customizadas
+                          </p>
+
+                          {/* Tipo de cobrança */}
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              marginBottom: 12,
+                            }}
+                          >
+                            {[
+                              ["pct", "% sobre vendas"],
+                              ["fixed", "Valor fixo mensal"],
+                            ].map(([val, label]) => (
+                              <button
+                                key={val}
+                                onClick={() =>
+                                  setCustomFees((prev) => ({
+                                    ...prev,
+                                    [s.id]: {
+                                      ...prev[s.id],
+                                      billing_type: val,
+                                    },
+                                  }))
+                                }
+                                style={{
+                                  flex: 1,
+                                  padding: "8px",
+                                  borderRadius: 10,
+                                  border: `1.5px solid ${customFees[s.id]?.billing_type === val ? colors.rosa : colors.bordaLilas}`,
+                                  background:
+                                    customFees[s.id]?.billing_type === val
+                                      ? "#fff0f8"
+                                      : "#fff",
+                                  color:
+                                    customFees[s.id]?.billing_type === val
+                                      ? colors.rosa
+                                      : "#888",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  fontFamily: "'Space Grotesk', sans-serif",
+                                }}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 8,
+                              marginBottom: 12,
+                            }}
+                          >
+                            <div>
+                              <p
+                                style={{
+                                  fontSize: 11,
+                                  color: "#888",
+                                  marginBottom: 4,
+                                }}
+                              >
+                                Taxa de adesão customizada (R$) — deixe vazio
+                                para usar o padrão
+                              </p>
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder={`Padrão: R$ ${config?.signup_fee ?? "—"}`}
+                                value={
+                                  customFees[s.id]?.custom_signup_fee ?? ""
+                                }
+                                onChange={(e) =>
+                                  setCustomFees((prev) => ({
+                                    ...prev,
+                                    [s.id]: {
+                                      ...prev[s.id],
+                                      custom_signup_fee: e.target.value,
+                                    },
+                                  }))
+                                }
+                                style={{
+                                  width: "100%",
+                                  padding: "8px 12px",
+                                  borderRadius: 10,
+                                  border: `1.5px solid ${colors.bordaLilas}`,
+                                  fontSize: 13,
+                                  outline: "none",
+                                  boxSizing: "border-box",
+                                  fontFamily: "'Space Grotesk', sans-serif",
+                                }}
+                              />
+                            </div>
+                            {customFees[s.id]?.billing_type === "fixed" ? (
+                              <div>
+                                <p
+                                  style={{
+                                    fontSize: 11,
+                                    color: "#888",
+                                    marginBottom: 4,
+                                  }}
+                                >
+                                  Valor fixo mensal (R$)
+                                </p>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="Ex: 49,90"
+                                  value={
+                                    customFees[s.id]?.custom_monthly_fee ?? ""
+                                  }
+                                  onChange={(e) =>
+                                    setCustomFees((prev) => ({
+                                      ...prev,
+                                      [s.id]: {
+                                        ...prev[s.id],
+                                        custom_monthly_fee: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                  style={{
+                                    width: "100%",
+                                    padding: "8px 12px",
+                                    borderRadius: 10,
+                                    border: `1.5px solid ${colors.bordaLilas}`,
+                                    fontSize: 13,
+                                    outline: "none",
+                                    boxSizing: "border-box",
+                                    fontFamily: "'Space Grotesk', sans-serif",
+                                  }}
+                                />
+                              </div>
+                            ) : (
+                              <div>
+                                <p
+                                  style={{
+                                    fontSize: 11,
+                                    color: "#888",
+                                    marginBottom: 4,
+                                  }}
+                                >
+                                  % sobre vendas customizado — deixe vazio para
+                                  usar o padrão ({config?.monthly_pct ?? "—"}%)
+                                </p>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  placeholder={`Padrão: ${config?.monthly_pct ?? "—"}%`}
+                                  value={
+                                    customFees[s.id]?.custom_monthly_pct ?? ""
+                                  }
+                                  onChange={(e) =>
+                                    setCustomFees((prev) => ({
+                                      ...prev,
+                                      [s.id]: {
+                                        ...prev[s.id],
+                                        custom_monthly_pct: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                  style={{
+                                    width: "100%",
+                                    padding: "8px 12px",
+                                    borderRadius: 10,
+                                    border: `1.5px solid ${colors.bordaLilas}`,
+                                    fontSize: 13,
+                                    outline: "none",
+                                    boxSizing: "border-box",
+                                    fontFamily: "'Space Grotesk', sans-serif",
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              onClick={() => setEditingStore(null)}
+                              style={{
+                                flex: 1,
+                                padding: "8px",
+                                borderRadius: 10,
+                                border: `1px solid ${colors.bordaLilas}`,
+                                background: "#fff",
+                                color: "#888",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={() => handleSaveCustomFees(s.id)}
+                              disabled={savingFees}
+                              style={{
+                                flex: 1,
+                                padding: "8px",
+                                borderRadius: 10,
+                                border: "none",
+                                background: colors.rosa,
+                                color: "#fff",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              {savingFees ? "Salvando..." : "Salvar"}
+                            </button>
+                          </div>
+
+                          {/* Mostra taxas atuais */}
+                          {((s as any).billing_type === "fixed" ||
+                            (s as any).custom_monthly_pct ||
+                            (s as any).custom_signup_fee) && (
+                            <div
+                              style={{
+                                marginTop: 10,
+                                padding: "8px 10px",
+                                background: colors.lilasClaro,
+                                borderRadius: 8,
+                              }}
+                            >
+                              <p
+                                style={{
+                                  fontSize: 11,
+                                  color: "#7e22ce",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Taxas atuais deste comércio:
+                              </p>
+                              {(s as any).custom_signup_fee && (
+                                <p style={{ fontSize: 11, color: "#7e22ce" }}>
+                                  • Adesão: R${" "}
+                                  {Number((s as any).custom_signup_fee).toFixed(
+                                    2,
+                                  )}
+                                </p>
+                              )}
+                              {(s as any).billing_type === "fixed" &&
+                                (s as any).custom_monthly_fee && (
+                                  <p style={{ fontSize: 11, color: "#7e22ce" }}>
+                                    • Mensalidade fixa: R${" "}
+                                    {Number(
+                                      (s as any).custom_monthly_fee,
+                                    ).toFixed(2)}
+                                  </p>
+                                )}
+                              {(s as any).billing_type === "pct" &&
+                                (s as any).custom_monthly_pct && (
+                                  <p style={{ fontSize: 11, color: "#7e22ce" }}>
+                                    • % vendas: {(s as any).custom_monthly_pct}%
+                                  </p>
+                                )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))
                 )}

@@ -10,6 +10,16 @@ export default function MotoboyRouteScreen() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { activeRoute, stops, loading, confirmDelivery } = useMotoboyData();
+
+  console.log(
+    "🏍️ MotoboyRoute - activeRoute:",
+    activeRoute?.id,
+    "status:",
+    activeRoute?.status,
+    "user:",
+    user?.id,
+  );
+
   const gps = useGpsSender(activeRoute?.id ?? null, user?.id ?? null);
 
   const deliveredCount = stops.filter((s) => s.delivered_at).length;
@@ -27,7 +37,9 @@ export default function MotoboyRouteScreen() {
           justifyContent: "center",
         }}
       >
-        <Spinner size={36} />
+        <div style={{ maxWidth: 520, margin: "0 auto" }}>
+          <Spinner size={36} />
+        </div>
       </div>
     );
 
@@ -162,7 +174,7 @@ export default function MotoboyRouteScreen() {
                 width: 7,
                 height: 7,
                 borderRadius: "50%",
-                background: gps.active ? colors.rosa : "#6b7280",
+                background: gps.active ? colors.rosa : "#ef4444",
                 animation: gps.active
                   ? "chegô-blink 1s ease-in-out infinite"
                   : "none",
@@ -171,11 +183,15 @@ export default function MotoboyRouteScreen() {
             <span
               style={{
                 fontSize: 10,
-                color: gps.active ? colors.rosa : "#6b7280",
+                color: gps.active ? colors.rosa : "#ef4444",
                 fontWeight: 600,
               }}
             >
-              {gps.active ? "GPS ativo" : "GPS inativo"}
+              {gps.active
+                ? "GPS ativo"
+                : gps.error
+                  ? "⚠️ GPS bloqueado"
+                  : "GPS inativo"}
             </span>
           </div>
         </div>
@@ -184,6 +200,57 @@ export default function MotoboyRouteScreen() {
           {stops.length - deliveredCount} restantes
         </p>
       </div>
+
+      {/* Banner de erro de GPS */}
+      {gps.error && (
+        <div
+          style={{
+            background: "#fef2f2",
+            borderBottom: "1px solid #fca5a5",
+            padding: "12px 16px",
+            display: "flex",
+            gap: 10,
+            alignItems: "flex-start",
+          }}
+        >
+          <span style={{ fontSize: 20, flexShrink: 0 }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <p
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#991b1b",
+                marginBottom: 4,
+              }}
+            >
+              GPS bloqueado
+            </p>
+            <p style={{ fontSize: 11, color: "#7f1d1d", lineHeight: 1.6 }}>
+              Para o cliente rastrear a entrega, você precisa permitir o acesso
+              à localização.{"\n"}
+              Toque no ícone de cadeado 🔒 na barra do navegador → Localização →
+              Permitir.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                marginTop: 8,
+                padding: "7px 16px",
+                borderRadius: 8,
+                background: "#991b1b",
+                color: "#fff",
+                border: "none",
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              🔄 Tentar novamente
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mapa */}
       <div
@@ -434,11 +501,11 @@ export default function MotoboyRouteScreen() {
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
-                    opacity: !isDone && !isNext ? 0.5 : 1,
-                    cursor: isNext ? "pointer" : "default",
+                    opacity: isDone ? 0.6 : 1,
+                    cursor: isDone ? "default" : "pointer",
                   }}
                   onClick={() =>
-                    isNext && navigate(`/motoboy/deliver/${stop.order_id}`)
+                    !isDone && navigate(`/motoboy/deliver/${stop.order_id}`)
                   }
                 >
                   <div
@@ -447,20 +514,16 @@ export default function MotoboyRouteScreen() {
                       height: 26,
                       borderRadius: "50%",
                       flexShrink: 0,
-                      background: isDone
-                        ? "#22c55e"
-                        : isNext
-                          ? colors.rosa
-                          : "#d1d5db",
+                      background: isDone ? "#22c55e" : colors.rosa,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       fontSize: 10,
                       fontWeight: 700,
                       color: "#fff",
-                      animation: isNext
-                        ? "chegô-blink 1.2s ease-in-out infinite"
-                        : "none",
+                      animation: isDone
+                        ? "none"
+                        : "chegô-blink 1.2s ease-in-out infinite",
                     }}
                   >
                     {isDone ? "✓" : stop.stop_number}

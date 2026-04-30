@@ -60,6 +60,19 @@ const STATUS_CONFIG: Record<
 
 export default function CashierTablesScreen() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!store?.id) return;
+    supabase
+      .from("store_invoices")
+      .select("id")
+      .eq("store_id", store.id)
+      .eq("status", "overdue")
+      .then(({ data }) => {
+        if ((data?.length ?? 0) > 0)
+          navigate("/store/billing", { replace: true });
+      });
+  }, [store?.id]);
   const { store } = useStore();
   const { signOut } = useAuth();
   const storeId = store?.id ?? null;
@@ -721,10 +734,16 @@ export default function CashierTablesScreen() {
                       .from("pdv_order_items")
                       .select("*")
                       .eq("order_id", order.id);
-                   
+                    console.log("[Caixa] freshItems:", freshItems);
                     const currentItems = freshItems ?? order.pdv_order_items;
 
-                   
+                    console.log(
+                      "[Caixa] currentItems:",
+                      currentItems?.map((i: any) => ({
+                        name: i.name,
+                        status: i.status,
+                      })),
+                    );
                     // Verifica itens pendentes/preparando
                     const pendingItems = currentItems.filter((i: any) =>
                       ["pending", "preparing"].includes(i.status),
