@@ -38,7 +38,7 @@ import BalcaoHomeScreen from "./screens/balcao/BalcaoHomeSrcreen";
 import StoreBalcaoUsersScreen from "./screens/store/StoreBalcaoUsersScreen";
 import StorePromotionsScreen from "./screens/store/StorePromotionsScreen";
 import StoreRevenueScreen from "./screens/store/StoreRevenueScreen";
-import CashierPDVScreen from "./screens/cashier/CashierPDVScreen";
+import CashierPDVScreen from "./screens/cashier/CashierPdvScreen";
 import KitchenScreen from "./screens/kitchen/KitchenScreen";
 import WaiterBillScreen from "./screens/waiter/WaiterBillScreen";
 import WaiterTablesScreen from "./screens/waiter/WaiterTablesScreen";
