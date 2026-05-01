@@ -335,7 +335,7 @@ export default function StoreBillingScreen() {
           style={{
             background: "none",
             border: "none",
-            color: "rgba(255,255,255,0.35)",
+            color: "#fff",
             fontSize: 13,
             cursor: "pointer",
             marginBottom: 10,

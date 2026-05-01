@@ -194,19 +194,17 @@ export function CartScreen() {
 
       if (orderErr) throw new Error(orderErr.message);
 
-      const { error: itemsErr } = await supabase
-        .from("order_items")
-        .insert(
-          items.map((item) => ({
-            order_id: order.id,
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_price: item.price,
-            total_price: item.price * item.quantity,
-            notes: item.notes ?? null,
-            custom_name: item.name ?? null,
-          })),
-        );
+      const { error: itemsErr } = await supabase.from("order_items").insert(
+        items.map((item) => ({
+          order_id: order.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.price * item.quantity,
+          notes: item.notes ?? null,
+          custom_name: item.name ?? null,
+        })),
+      );
       if (itemsErr) throw new Error(itemsErr.message);
 
       notify.orderCreated(order.id);
@@ -309,7 +307,7 @@ export function CartScreen() {
             style={{
               background: "none",
               border: "none",
-              color: "rgba(255,255,255,0.35)",
+              color: "#fff",
               fontSize: 13,
               cursor: "pointer",
               marginBottom: 10,
@@ -325,7 +323,7 @@ export function CartScreen() {
           <p
             style={{
               fontSize: 11,
-              color: "rgba(255,255,255,0.4)",
+              color: "#fff",
               marginTop: 2,
             }}
           >

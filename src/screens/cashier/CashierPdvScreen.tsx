@@ -355,7 +355,7 @@ export default function CashierPDVScreen() {
               border: "1px solid rgba(255,255,255,0.15)",
               borderRadius: 10,
               padding: "8px 14px",
-              color: "rgba(255,255,255,0.6)",
+              color: "#fff",
               fontSize: 12,
               cursor: "pointer",
               fontFamily: "'Space Grotesk', sans-serif",

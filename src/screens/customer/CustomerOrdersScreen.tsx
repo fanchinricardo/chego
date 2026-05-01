@@ -490,7 +490,7 @@ export function CustomerTrackingScreen() {
             style={{
               background: "none",
               border: "none",
-              color: "rgba(255,255,255,0.35)",
+              color: "#fff",
               fontSize: 13,
               cursor: "pointer",
               marginBottom: 10,
@@ -521,7 +521,7 @@ export function CustomerTrackingScreen() {
           <p
             style={{
               fontSize: 11,
-              color: "rgba(255,255,255,0.4)",
+              color: "#fff",
               marginTop: 2,
             }}
           >

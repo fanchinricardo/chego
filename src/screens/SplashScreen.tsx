@@ -51,7 +51,7 @@ export default function SplashScreen() {
         <p
           style={{
             fontSize: 11,
-            color: "rgba(255,255,255,0.3)",
+            color: "#fff",
             letterSpacing: "0.16em",
             textTransform: "uppercase",
             marginTop: 4,
