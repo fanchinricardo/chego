@@ -61,6 +61,8 @@ const STATUS_CONFIG: Record<
 export default function CashierTablesScreen() {
   const navigate = useNavigate();
 
+  const { store } = useStore();
+
   useEffect(() => {
     if (!store?.id) return;
     supabase
@@ -73,7 +75,6 @@ export default function CashierTablesScreen() {
           navigate("/store/billing", { replace: true });
       });
   }, [store?.id]);
-  const { store } = useStore();
   const { signOut } = useAuth();
   const storeId = store?.id ?? null;
 
@@ -86,12 +87,14 @@ export default function CashierTablesScreen() {
   const [waitingTables, setWaitingTables] = useState<Set<string>>(new Set());
 
   const fetchTables = useCallback(async () => {
+    console.log("[Caixa] storeId:", storeId, "store:", store?.id, store?.name);
     if (!storeId) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("pdv_tables")
       .select("*")
       .eq("store_id", storeId)
       .order("number");
+    console.log("[Caixa] mesas:", data?.length, "error:", error?.message);
     setTables((data ?? []) as PDVTable[]);
     setLoading(false);
     const waiting = new Set<string>(

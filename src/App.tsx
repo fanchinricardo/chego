@@ -34,9 +34,11 @@ import StoreKitchenScreen from "./screens/store/StoreKitchenScreen";
 import TablePublicScreen from "./screens/table/TablePublicScreen";
 import CashierTablesScreen from "./screens/cashier/CashierTablesScreen";
 import SupportScreen from "./screens/support/SupportScreen";
+import BalcaoHomeScreen from "./screens/balcao/BalcaoHomeSrcreen";
+import StoreBalcaoUsersScreen from "./screens/store/StoreBalcaoUsersScreen";
 import StorePromotionsScreen from "./screens/store/StorePromotionsScreen";
 import StoreRevenueScreen from "./screens/store/StoreRevenueScreen";
-import CashierPDVScreen from "./screens/cashier/CashierPdvScreen";
+import CashierPDVScreen from "./screens/cashier/CashierPDVScreen";
 import KitchenScreen from "./screens/kitchen/KitchenScreen";
 import WaiterBillScreen from "./screens/waiter/WaiterBillScreen";
 import WaiterTablesScreen from "./screens/waiter/WaiterTablesScreen";
@@ -152,6 +154,7 @@ function PrivateRoute({
       admin: "/admin",
       store: "/store",
       motoboy: "/motoboy",
+      balcao: "/balcao",
       waiter: "/waiter",
       kitchen: "/kitchen",
       customer: "/home",
@@ -176,6 +179,7 @@ function PublicRoute({ children }: { children: JSX.Element }) {
       admin: "/admin",
       store: "/store",
       motoboy: "/motoboy",
+      balcao: "/balcao",
       waiter: "/waiter",
       kitchen: "/kitchen",
       customer: "/home",
@@ -363,8 +367,24 @@ export default function App() {
             <Route
               path="/cashier"
               element={
-                <PrivateRoute allowedRoles={["store"]}>
+                <PrivateRoute allowedRoles={["store", "balcao"]}>
                   <CashierTablesScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/balcao"
+              element={
+                <PrivateRoute allowedRoles={["balcao"]}>
+                  <BalcaoHomeScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/store/balcao-users"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <StoreBalcaoUsersScreen />
                 </PrivateRoute>
               }
             />
@@ -395,7 +415,7 @@ export default function App() {
             <Route
               path="/cashier/pdv"
               element={
-                <PrivateRoute allowedRoles={["store"]}>
+                <PrivateRoute allowedRoles={["store", "balcao"]}>
                   <CashierPDVScreen />
                 </PrivateRoute>
               }
@@ -492,7 +512,7 @@ export default function App() {
             <Route
               path="/store/route/new"
               element={
-                <PrivateRoute allowedRoles={["store"]}>
+                <PrivateRoute allowedRoles={["store", "balcao"]}>
                   <RouteBuilderScreen />
                 </PrivateRoute>
               }

@@ -29,7 +29,14 @@ export interface SignUpData {
   store_id?: string | null;
   kitchen_categories?: string[];
   phone: string;
-  role: "customer" | "store" | "motoboy" | "waiter" | "kitchen" | "admin";
+  role:
+    | "customer"
+    | "store"
+    | "motoboy"
+    | "waiter"
+    | "kitchen"
+    | "admin"
+    | "balcao";
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -96,7 +103,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 2. Profile não existe — cria via RPC
     const meta = u.user_metadata ?? {};
-    const validRoles = ["store", "customer", "motoboy", "waiter", "kitchen"];
+    const validRoles = [
+      "store",
+      "customer",
+      "motoboy",
+      "waiter",
+      "kitchen",
+      "balcao",
+      "admin",
+    ];
     const role = validRoles.includes(meta.role) ? meta.role : "customer";
     const full_name =
       meta.full_name?.trim() ||

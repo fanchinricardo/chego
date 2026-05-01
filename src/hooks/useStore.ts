@@ -38,11 +38,24 @@ export function useStore() {
     setLoading(true);
     setError(null);
 
-    const { data, error: err } = await supabase
-      .from("stores")
-      .select("*, store_groups(name, icon)")
-      .eq("owner_id", user.id)
-      .maybeSingle();
+    // Busca o profile para verificar role e store_id (usuário balcão)
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, store_id")
+      .eq("id", user.id)
+      .single();
+
+    let query = supabase.from("stores").select("*, store_groups(name, icon)");
+
+    if (profile?.role === "balcao" && profile?.store_id) {
+      // Usuário balcão — busca pelo store_id do profile
+      query = query.eq("id", profile.store_id);
+    } else {
+      // Dono da loja — busca pelo owner_id
+      query = query.eq("owner_id", user.id);
+    }
+
+    const { data, error: err } = await query.maybeSingle();
 
     if (err) {
       setError(err.message);

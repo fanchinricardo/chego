@@ -12,7 +12,7 @@ interface KitchenUser {
   full_name: string;
   phone: string | null;
   created_at: string;
-  kitchen_categories: string[];
+  kitchen_categories: string[] | null | undefined;
 }
 
 export default function StoreKitchenScreen() {
@@ -142,7 +142,7 @@ export default function StoreKitchenScreen() {
             style={{
               background: "none",
               border: "none",
-              color: "#fff",
+              color: "rgba(255,255,255,0.35)",
               fontSize: 13,
               cursor: "pointer",
               marginBottom: 10,
@@ -175,7 +175,20 @@ export default function StoreKitchenScreen() {
               </p>
             </div>
             <button
-              onClick={() => setShowForm((v) => !v)}
+              onClick={() =>
+                setShowForm((v) => {
+                  if (!v) {
+                    setForm({
+                      full_name: "",
+                      email: "",
+                      password: "",
+                      categories: [],
+                    });
+                    setEditingId(null);
+                  }
+                  return !v;
+                })
+              }
               style={{
                 background: showForm ? "rgba(255,255,255,0.1)" : colors.rosa,
                 color: "#fff",
@@ -276,7 +289,7 @@ export default function StoreKitchenScreen() {
                 ) : (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {categories.map((cat) => {
-                      const selected = form.categories.includes(cat);
+                      const selected = (form.categories ?? []).includes(cat);
                       return (
                         <button
                           key={cat}
@@ -285,7 +298,7 @@ export default function StoreKitchenScreen() {
                             setForm((f) => ({
                               ...f,
                               categories: selected
-                                ? f.categories.filter((c) => c !== cat)
+                                ? (f.categories ?? []).filter((c) => c !== cat)
                                 : [...f.categories, cat],
                             }))
                           }
@@ -387,8 +400,8 @@ export default function StoreKitchenScreen() {
                   {u.full_name}
                 </p>
                 <p style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
-                  {u.kitchen_categories?.length > 0
-                    ? u.kitchen_categories.join(", ")
+                  {(u.kitchen_categories ?? []).length > 0
+                    ? (u.kitchen_categories ?? []).join(", ")
                     : "Todas as categorias"}
                 </p>
               </div>

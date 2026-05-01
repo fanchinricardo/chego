@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
 import { supabase } from "../../lib/supabase";
 import { useStore } from "../../hooks/useStore";
 import { useAuth } from "../../contexts/AuthContext";
@@ -99,8 +100,16 @@ export default function StoreProfileScreen() {
         delivery_fee: Number(form.delivery_fee),
         estimated_time: Number(form.estimated_time),
       });
-      showToast("Dados salvos!");
       setEditing(false);
+      await Swal.fire({
+        icon: "success",
+        title: "Dados salvos!",
+        text: "Suas informações foram atualizadas com sucesso.",
+        timer: 2000,
+        showConfirmButton: false,
+        toast: true,
+        position: "top-end",
+      });
     } catch (e: any) {
       showToast(e.message, "error");
     } finally {
@@ -363,6 +372,11 @@ export default function StoreProfileScreen() {
               { icon: "📊", label: "Faturamento", path: "/store/revenue" },
               { icon: "🎉", label: "Promoções", path: "/store/promotions" },
               { icon: "🎧", label: "Suporte", path: "/support" },
+              {
+                icon: "🏪",
+                label: "Usuários Balcão",
+                path: "/store/balcao-users",
+              },
               { icon: "🧑‍🍳", label: "Garçons", path: "/store/waiters" },
               { icon: "👨‍🍳", label: "Cozinha", path: "/store/kitchen" },
               {

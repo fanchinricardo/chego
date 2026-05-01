@@ -92,7 +92,7 @@ export function CartScreen() {
     try {
       const { data: store } = await supabase
         .from("stores")
-        .select("delivery_fee, min_order_value")
+        .select("delivery_fee, min_order_value, city")
         .eq("id", storeId)
         .single();
       const delivFee = Number(store?.delivery_fee ?? 0);
@@ -141,6 +141,29 @@ export function CartScreen() {
 
       // Usa trocoValue direto pois setChangeFor é assíncrono
       const changeForValue = trocoFinal;
+
+      // Valida se o cliente está na mesma cidade quando for delivery
+      if (deliveryType === "delivery" && address?.city && store?.city) {
+        const clientCity = address.city
+          .trim()
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+        const storeCity = store.city
+          .trim()
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+        if (clientCity !== storeCity) {
+          await Swal.fire({
+            icon: "error",
+            title: "Fora da área de entrega",
+            html: `Este comércio só realiza entregas em <strong>${store.city}</strong>.<br/>Seu endereço está em <strong>${address.city}</strong>.`,
+            confirmButtonColor: colors.rosa,
+          });
+          return;
+        }
+      }
 
       const { data: order, error: orderErr } = await supabase
         .from("orders")
@@ -1427,7 +1450,7 @@ export function PaymentScreen() {
             style={{
               background: "none",
               border: "none",
-              color: "#fff",
+              color: "rgba(255,255,255,0.35)",
               fontSize: 13,
               cursor: "pointer",
               marginBottom: 10,

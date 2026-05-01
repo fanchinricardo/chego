@@ -19,6 +19,8 @@ const METHOD_LABEL: Record<string, string> = {
 export default function CashierPDVScreen() {
   const navigate = useNavigate();
 
+  const { store } = useStore();
+
   useEffect(() => {
     if (!store?.id) return;
     supabase
@@ -31,7 +33,6 @@ export default function CashierPDVScreen() {
           navigate("/store/billing", { replace: true });
       });
   }, [store?.id]);
-  const { store } = useStore();
   const { profile } = useAuth();
   const storeId = store?.id ?? null;
   const { products, categories } = useStoreProducts(storeId);
