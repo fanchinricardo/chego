@@ -10,8 +10,21 @@ import {
 } from "../../hooks/useProductSizes";
 import { colors, Spinner, Toast } from "../../components/ui";
 
+// Mesmo mapeamento do ProductsScreen — fallback quando o produto não tem imagem
+const EMOJI_CATEGORIES: Record<string, string> = {
+  Geral: "📦",
+  Pizzas: "🍕",
+  Bebidas: "🥤",
+  Lanches: "🍔",
+  Sobremesas: "🍰",
+  Entradas: "🥗",
+  Massas: "🍝",
+  Carnes: "🥩",
+  Outros: "🏷️",
+};
+
 export default function CustomerStoreScreen() {
-  const { id } = useParams<{ id: string }>(); // rota: /loja/:id
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { store, loading: storeLoading } = useStoreDetail(id ?? null);
   const {
@@ -32,7 +45,6 @@ export default function CustomerStoreScreen() {
   const [pendingProduct, setPendingProduct] = useState<any | null>(null);
   const [productSizes, setProductSizes] = useState<Record<string, any[]>>({});
 
-  // Busca promoções ativas da loja
   useEffect(() => {
     if (!id) return;
     supabase
@@ -52,10 +64,6 @@ export default function CustomerStoreScreen() {
   }
 
   function openProduct(product: any) {
-    console.log("🍕 openProduct chamado:", product.name, {
-      allows_half: product.allows_half,
-      size_type: product.size_type,
-    });
     setSelectedProduct(product);
     setProductQty(1);
     setProductNotes("");
@@ -63,14 +71,11 @@ export default function CustomerStoreScreen() {
 
   function handleAddToCart(product: any) {
     if (!store) return;
-
-    // Carrinho de loja diferente
     if (cartStoreId && cartStoreId !== store.id) {
       setPendingProduct(product);
       setShowDiffStoreModal(true);
       return;
     }
-
     doAddToCart(product);
   }
 
@@ -98,7 +103,6 @@ export default function CustomerStoreScreen() {
       setShowDiffStoreModal(true);
       return;
     }
-    if (!store) return;
     for (let i = 0; i < (item.quantity ?? 1); i++) {
       addItem(
         {
@@ -443,7 +447,7 @@ export default function CustomerStoreScreen() {
                 {prods.map((product) => (
                   <div
                     key={product.id}
-                    onClick={() => openProduct(product)} // sempre abre modal
+                    onClick={() => openProduct(product)}
                     style={{
                       background: "#fff",
                       borderRadius: 13,
@@ -480,7 +484,9 @@ export default function CustomerStoreScreen() {
                           }}
                         />
                       ) : (
-                        "🍕"
+                        // Usa o emoji da categoria do produto.
+                        // Fallback "📦" para categorias não mapeadas.
+                        (EMOJI_CATEGORIES[product.category] ?? "📦")
                       )}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -607,7 +613,7 @@ export default function CustomerStoreScreen() {
         </div>
       )}
 
-      {/* Modal de produto — com tamanhos e meia pizza */}
+      {/* Modal de produto */}
       {selectedProduct && store && (
         <ProductModal
           product={selectedProduct}
@@ -616,234 +622,6 @@ export default function CustomerStoreScreen() {
           onAdd={handleCartItemAdd}
           onClose={() => setSelectedProduct(null)}
         />
-      )}
-
-      {/* REMOVIDO: modal inline antigo */}
-      {false && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            zIndex: 200,
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: colors.fundo,
-              borderRadius: "20px 20px 0 0",
-              width: "100%",
-              maxWidth: 480,
-              maxHeight: "85dvh",
-              overflowY: "auto",
-            }}
-          >
-            {/* Imagem */}
-            <div
-              style={{
-                height: 100,
-                background: colors.noite,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 40,
-                position: "relative",
-              }}
-            >
-              {selectedProduct.image_url ? (
-                <img
-                  src={selectedProduct.image_url}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                "🍕"
-              )}
-              <button
-                onClick={() => setSelectedProduct(null)}
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  right: 14,
-                  background: "rgba(255,255,255,0.15)",
-                  border: "none",
-                  borderRadius: "50%",
-                  width: 28,
-                  height: 28,
-                  color: "#fff",
-                  cursor: "pointer",
-                  fontSize: 14,
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div
-              style={{
-                padding: "16px 20px 32px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-              }}
-            >
-              <div>
-                <p
-                  style={{ fontSize: 17, fontWeight: 700, color: colors.noite }}
-                >
-                  {selectedProduct.name}
-                </p>
-                {selectedProduct.description && (
-                  <p
-                    style={{
-                      fontSize: 12,
-                      color: "#888",
-                      marginTop: 4,
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    {selectedProduct.description}
-                  </p>
-                )}
-                <p
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 700,
-                    color: colors.rosa,
-                    marginTop: 6,
-                  }}
-                >
-                  R$ {Number(selectedProduct.price).toFixed(2)}
-                </p>
-              </div>
-
-              {/* Observação */}
-              <div>
-                <p
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: colors.noite,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    marginBottom: 6,
-                  }}
-                >
-                  Observação
-                </p>
-                <textarea
-                  value={productNotes}
-                  onChange={(e) => setProductNotes(e.target.value)}
-                  placeholder="Sem cebola, borda recheada..."
-                  rows={2}
-                  style={{
-                    width: "100%",
-                    background: "#fff",
-                    border: `1.5px solid ${colors.bordaLilas}`,
-                    borderRadius: 10,
-                    padding: "8px 12px",
-                    fontSize: 13,
-                    color: colors.noite,
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    resize: "none",
-                    outline: "none",
-                  }}
-                />
-              </div>
-
-              {/* Quantidade */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  background: "#fff",
-                  borderRadius: 12,
-                  border: `1px solid ${colors.bordaLilas}`,
-                  padding: "10px 14px",
-                }}
-              >
-                <p
-                  style={{ fontSize: 13, fontWeight: 600, color: colors.noite }}
-                >
-                  Quantidade
-                </p>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <button
-                    onClick={() => setProductQty((q) => Math.max(1, q - 1))}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 8,
-                      background: colors.lilasClaro,
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: colors.noite,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    −
-                  </button>
-                  <span
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: colors.noite,
-                      minWidth: 20,
-                      textAlign: "center",
-                    }}
-                  >
-                    {productQty}
-                  </span>
-                  <button
-                    onClick={() => setProductQty((q) => q + 1)}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 8,
-                      background: colors.rosa,
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              <button
-                onClick={() => handleAddToCart(selectedProduct)}
-                style={{
-                  width: "100%",
-                  padding: "13px",
-                  borderRadius: 13,
-                  background: colors.rosa,
-                  color: "#fff",
-                  border: "none",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: "'Space Grotesk', sans-serif",
-                }}
-              >
-                Adicionar · R${" "}
-                {(Number(selectedProduct.price) * productQty).toFixed(2)}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Modal: loja diferente */}

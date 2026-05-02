@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { useAuth } from "../contexts/AuthContext";
 
 export type OrderStatus =
   | "pending"
@@ -29,6 +28,7 @@ export interface Order {
   status: OrderStatus;
   payment_status: "pending" | "paid" | "failed" | "refunded";
   payment_method: string | null;
+  delivery_type: string | null;
   subtotal: number;
   delivery_fee: number;
   total: number;
@@ -68,8 +68,19 @@ export function useOrders(storeId: string | null) {
     setLoading(true);
     setError(null);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Início do dia no horário LOCAL, convertido para UTC corretamente.
+    // Usar setHours(0,0,0,0) em UTC causaria perda de pedidos no Brasil
+    // (UTC-3): meia-noite local = 03:00 UTC, pedidos de 00h–02h59 sumiam.
+    const now = new Date();
+    const todayLocal = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      0,
+      0,
+      0,
+      0,
+    );
 
     const { data, error: err } = await supabase
       .from("orders")
@@ -84,8 +95,8 @@ export function useOrders(storeId: string | null) {
       `,
       )
       .eq("store_id", storeId)
-      .gte("created_at", today.toISOString())
-      .order("created_at", { ascending: true });
+      .gte("created_at", todayLocal.toISOString())
+      .order("created_at", { ascending: false });
 
     if (err) {
       setError(err.message);
@@ -96,7 +107,6 @@ export function useOrders(storeId: string | null) {
     const list = (data ?? []) as Order[];
     setOrders(list);
 
-    // Calcula stats do dia
     const active = list.filter((o) => o.status !== "cancelled");
     setStats({
       total: active.length,
@@ -113,7 +123,6 @@ export function useOrders(storeId: string | null) {
     setLoading(false);
   }, [storeId]);
 
-  // Atualiza status de um pedido
   const updateStatus = useCallback(
     async (orderId: string, status: OrderStatus) => {
       const { error } = await supabase
@@ -130,7 +139,6 @@ export function useOrders(storeId: string | null) {
     [],
   );
 
-  // Realtime: escuta novos pedidos e mudanças de status
   useEffect(() => {
     if (!storeId) return;
     fetchOrders();
@@ -145,7 +153,7 @@ export function useOrders(storeId: string | null) {
           table: "orders",
           filter: `store_id=eq.${storeId}`,
         },
-        () => fetchOrders(), // Re-busca quando qualquer mudança ocorrer
+        () => fetchOrders(),
       )
       .subscribe();
 

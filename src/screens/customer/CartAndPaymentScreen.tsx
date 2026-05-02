@@ -50,6 +50,7 @@ export function CartScreen() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [paymentMethod, setPaymentMethod] = useState<string>("pix_qr");
   const [storePixKey, setStorePixKey] = useState<string | null>(null);
+  const [deliveryFee, setDeliveryFee] = useState<number>(0);
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">(
     "delivery",
   );
@@ -65,17 +66,25 @@ export function CartScreen() {
     if (def && !selectedAddr) setSelectedAddr(def.id);
   }, [addresses]);
 
+  // Busca pix_key E delivery_fee da loja de uma vez
   useEffect(() => {
     if (!storeId) return;
     supabase
       .from("stores")
-      .select("pix_key")
+      .select("pix_key, delivery_fee")
       .eq("id", storeId)
       .maybeSingle()
-      .then(({ data }) => setStorePixKey(data?.pix_key ?? null));
+      .then(({ data }) => {
+        setStorePixKey(data?.pix_key ?? null);
+        setDeliveryFee(Number(data?.delivery_fee ?? 0));
+      });
   }, [storeId]);
 
   const address = addresses.find((a) => a.id === selectedAddr);
+
+  // Total real considerando tipo de entrega
+  const orderDeliveryFee = deliveryType === "pickup" ? 0 : deliveryFee;
+  const orderTotal = total + orderDeliveryFee;
 
   async function handleCheckout() {
     if (!user || !storeId) return;
@@ -95,10 +104,12 @@ export function CartScreen() {
         .select("delivery_fee, min_order_value, city")
         .eq("id", storeId)
         .single();
-      const delivFee = Number(store?.delivery_fee ?? 0);
+      const delivFee =
+        deliveryType === "pickup" ? 0 : Number(store?.delivery_fee ?? 0);
       const minOrder = Number(store?.min_order_value ?? 0);
       const subtotal = total;
-      const orderTotal = subtotal + delivFee;
+      const finalTotal = subtotal + delivFee;
+
       if (subtotal < minOrder && minOrder > 0) {
         showToast(`Pedido mínimo é R$ ${minOrder.toFixed(2)}`, "error");
         setSubmitting(false);
@@ -111,7 +122,7 @@ export function CartScreen() {
         const { value: trocoValue, isConfirmed } = await Swal.fire({
           title: "💵 Precisa de troco?",
           html: `
-          <p style="font-size:14px;color:#666;margin-bottom:16px">Total do pedido: <strong>R$ ${total.toFixed(2)}</strong></p>
+          <p style="font-size:14px;color:#666;margin-bottom:16px">Total do pedido: <strong>R$ ${finalTotal.toFixed(2)}</strong></p>
           <input id="swal-troco" type="number" step="0.01" placeholder="Digite o valor (ex: 50,00)" class="swal2-input" style="font-size:16px"/>
           <p style="font-size:12px;color:#aaa;margin-top:8px">Deixe em branco se não precisar de troco</p>
         `,
@@ -123,7 +134,7 @@ export function CartScreen() {
             const val = (
               document.getElementById("swal-troco") as HTMLInputElement
             )?.value;
-            if (val && Number(val) < total) {
+            if (val && Number(val) < finalTotal) {
               Swal.showValidationMessage(
                 "O valor deve ser maior que o total do pedido",
               );
@@ -139,10 +150,9 @@ export function CartScreen() {
         }
       }
 
-      // Usa trocoValue direto pois setChangeFor é assíncrono
       const changeForValue = trocoFinal;
 
-      // Valida se o cliente está na mesma cidade quando for delivery
+      // Valida cidade quando for delivery
       if (deliveryType === "delivery" && address?.city && store?.city) {
         const clientCity = address.city
           .trim()
@@ -175,7 +185,7 @@ export function CartScreen() {
           payment_status: "pending",
           subtotal,
           delivery_fee: delivFee,
-          total: orderTotal,
+          total: finalTotal,
           delivery_address:
             deliveryType === "pickup"
               ? "Retirada no local"
@@ -211,13 +221,13 @@ export function CartScreen() {
 
       if (paymentMethod === "pix_qr" || paymentMethod === "credito_mp") {
         navigate("/payment", {
-          state: { orderId: order.id, total: orderTotal, paymentMethod },
+          state: { orderId: order.id, total: finalTotal, paymentMethod },
         });
       } else if (paymentMethod === "pix_manual") {
         navigate("/payment", {
           state: {
             orderId: order.id,
-            total: orderTotal,
+            total: finalTotal,
             paymentMethod,
             pixKey: storePixKey,
           },
@@ -320,13 +330,7 @@ export function CartScreen() {
           <p style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>
             Meu Carrinho
           </p>
-          <p
-            style={{
-              fontSize: 11,
-              color: "#fff",
-              marginTop: 2,
-            }}
-          >
+          <p style={{ fontSize: 11, color: "#fff", marginTop: 2 }}>
             {storeName} · {items.reduce((s, i) => s + i.quantity, 0)} itens
           </p>
         </div>
@@ -532,13 +536,16 @@ export function CartScreen() {
                 id: "delivery",
                 icon: "🛵",
                 label: "Entrega",
-                sub: "Recebo em casa",
+                sub:
+                  deliveryFee > 0
+                    ? `Taxa: R$ ${deliveryFee.toFixed(2)}`
+                    : "Frete grátis",
               },
               {
                 id: "pickup",
                 icon: "🏪",
                 label: "Retirada",
-                sub: "Busco no local",
+                sub: "Busco no local · Grátis",
               },
             ].map((t) => (
               <div
@@ -809,7 +816,7 @@ export function CartScreen() {
           </div>
         </div>
 
-        {/* Resumo */}
+        {/* ── Resumo — valores reais com delivery_fee da loja ── */}
         <div
           style={{
             background: "#fff",
@@ -838,7 +845,21 @@ export function CartScreen() {
             }}
           >
             <span style={{ fontSize: 12, color: "#888" }}>Entrega</span>
-            <span style={{ fontSize: 12, color: "#22c55e" }}>R$ 0,00</span>
+            <span
+              style={{
+                fontSize: 12,
+                color:
+                  deliveryType === "pickup" || deliveryFee === 0
+                    ? "#22c55e"
+                    : colors.noite,
+              }}
+            >
+              {deliveryType === "pickup"
+                ? "Grátis (retirada)"
+                : deliveryFee > 0
+                  ? `R$ ${deliveryFee.toFixed(2)}`
+                  : "Grátis"}
+            </span>
           </div>
           <div
             style={{
@@ -854,7 +875,7 @@ export function CartScreen() {
               Total
             </span>
             <span style={{ fontSize: 16, fontWeight: 700, color: colors.rosa }}>
-              R$ {total.toFixed(2)}
+              R$ {orderTotal.toFixed(2)}
             </span>
           </div>
         </div>

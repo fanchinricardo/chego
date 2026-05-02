@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../contexts/AuthContext";
 import { useStore } from "../../hooks/useStore";
 import { useReadyOrders } from "../../hooks/useOrders";
 import { useMotoboys } from "../../hooks/useRoutes";
@@ -12,11 +13,46 @@ import {
 import { colors, Spinner, Toast } from "../../components/ui";
 import { BottomNav } from "./StoreDashboard";
 
+// Resolve o storeId para donos E funcionários de balcão
+function useStoreId() {
+  const { store } = useStore();
+  const { profile } = useAuth();
+  const [resolvedId, setResolvedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 1. Dono da loja — useStore já resolve
+    if (store?.id) {
+      setResolvedId(store.id);
+      return;
+    }
+    // 2. Funcionário vinculado via profile.store_id
+    if ((profile as any)?.store_id) {
+      setResolvedId((profile as any).store_id);
+      return;
+    }
+    // 3. Fallback: busca no Supabase pelo owner_id
+    if (profile?.id) {
+      supabase
+        .from("stores")
+        .select("id")
+        .eq("owner_id", profile.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.id) setResolvedId(data.id);
+        });
+    }
+  }, [store?.id, profile]);
+
+  return resolvedId;
+}
+
 export default function RouteBuilderScreen() {
   const navigate = useNavigate();
   const { store } = useStore();
-  const { orders, loading: ordersLoading } = useReadyOrders(store?.id ?? null);
-  const { motoboys, loading: motoboyLoading } = useMotoboys(store?.id ?? null);
+  const storeId = useStoreId();
+
+  const { orders, loading: ordersLoading } = useReadyOrders(storeId);
+  const { motoboys, loading: motoboyLoading } = useMotoboys(storeId);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [motoboyId, setMotoboyId] = useState<string>("");
@@ -31,7 +67,6 @@ export default function RouteBuilderScreen() {
     setTimeout(() => setToast(""), 3000);
   }
 
-  // Pedidos com status "ready"
   const readyOrders = orders.filter((o) => o.status === "ready");
 
   function toggleOrder(id: string) {
@@ -60,20 +95,17 @@ export default function RouteBuilderScreen() {
       showToast("Escolha um motoboy", "error");
       return;
     }
-    if (!store) return;
+    if (!storeId) return;
 
     setOptimizing(true);
     try {
-      // Monta waypoints — inclui pedidos mesmo sem coordenadas GPS
       const selectedOrders = readyOrders.filter((o) => selected.has(o.id));
 
-      // Tenta geocodificar endereços que não têm coordenadas
       const waypoints: Waypoint[] = [];
       for (const o of selectedOrders) {
         let lat = o.delivery_lat ? Number(o.delivery_lat) : null;
         let lng = o.delivery_lng ? Number(o.delivery_lng) : null;
 
-        // Se não tem coordenadas mas tem endereço, tenta geocodificar
         if ((!lat || !lng) && o.delivery_address) {
           try {
             const geo = await geocodeAddress(o.delivery_address);
@@ -82,7 +114,7 @@ export default function RouteBuilderScreen() {
               lng = geo.lng;
             }
           } catch {
-            // Ignora erro de geocodificação
+            /* ignora */
           }
         }
 
@@ -98,22 +130,33 @@ export default function RouteBuilderScreen() {
         });
       }
 
-      // Se não tiver coords nos pedidos, usa endereço da loja como origem
+      // Usa coordenadas da loja se disponíveis, senão SP como fallback
+      const storeData =
+        store ??
+        (await supabase
+          .from("stores")
+          .select("lat, lng")
+          .eq("id", storeId)
+          .single()
+          .then(({ data }) => data));
+
       const origin =
-        store.lat && store.lng
-          ? { lat: Number(store.lat), lng: Number(store.lng) }
-          : { lat: -23.5505, lng: -46.6333 }; // SP fallback
+        (storeData as any)?.lat && (storeData as any)?.lng
+          ? {
+              lat: Number((storeData as any).lat),
+              lng: Number((storeData as any).lng),
+            }
+          : { lat: -23.5505, lng: -46.6333 };
 
       const result = await optimizeRoute(origin, waypoints);
 
-      // Navega para tela de confirmação passando o resultado
       navigate("/store/route/confirm", {
         state: {
           stops: result.stops,
           totalDist: result.total_distance_km,
           totalMin: result.total_duration_min,
           motoboyId,
-          storeId: store.id,
+          storeId, // agora sempre válido para dono e funcionário
         },
       });
     } catch (err: any) {
@@ -163,9 +206,7 @@ export default function RouteBuilderScreen() {
         <p style={{ fontSize: 11, color: "#fff" }}>
           Selecione os pedidos prontos para entrega
         </p>
-
-        {/* Barra de progresso dos passos */}
-        <div style={{ display: "flex", gap: 4, marginTop: 12, color: "#fff" }}>
+        <div style={{ display: "flex", gap: 4, marginTop: 12 }}>
           {[0, 1, 2].map((i) => (
             <div
               key={i}
@@ -191,6 +232,23 @@ export default function RouteBuilderScreen() {
           gap: 14,
         }}
       >
+        {/* Aviso se storeId não resolvido */}
+        {!storeId && (
+          <div
+            style={{
+              background: "#fff8e6",
+              border: "1px solid #fcd34d",
+              borderRadius: 12,
+              padding: "12px 14px",
+            }}
+          >
+            <p style={{ fontSize: 12, color: "#92400e" }}>
+              ⚠️ Nenhuma loja associada a este usuário. Peça ao administrador
+              para vincular sua conta.
+            </p>
+          </div>
+        )}
+
         {/* Pedidos prontos */}
         <div>
           <div
@@ -277,10 +335,8 @@ export default function RouteBuilderScreen() {
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
-                      transition: "all 0.15s",
                     }}
                   >
-                    {/* Checkbox */}
                     <div
                       style={{
                         width: 20,
@@ -301,7 +357,6 @@ export default function RouteBuilderScreen() {
                     >
                       {isSelected ? "✓" : ""}
                     </div>
-
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p
                         style={{
@@ -326,7 +381,6 @@ export default function RouteBuilderScreen() {
                         {order.delivery_address ?? items}
                       </p>
                     </div>
-
                     <p
                       style={{
                         fontSize: 13,
@@ -424,7 +478,6 @@ export default function RouteBuilderScreen() {
                   justifyContent: "center",
                   fontFamily: "'Righteous', cursive",
                   fontSize: 16,
-                  fontWeight: 700,
                   color: "#fff",
                   flexShrink: 0,
                 }}
@@ -433,7 +486,7 @@ export default function RouteBuilderScreen() {
                   ?.slice(0, 1)
                   .toUpperCase() ?? "?"}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ flex: 1 }}>
                 <p
                   style={{ fontSize: 13, fontWeight: 700, color: colors.noite }}
                 >
@@ -521,14 +574,13 @@ export default function RouteBuilderScreen() {
                         justifyContent: "center",
                         fontFamily: "'Righteous', cursive",
                         fontSize: 16,
-                        fontWeight: 700,
                         color: "#fff",
                         flexShrink: 0,
                       }}
                     >
                       {m.profiles?.full_name?.slice(0, 1).toUpperCase() ?? "?"}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ flex: 1 }}>
                       <p
                         style={{
                           fontSize: 13,
@@ -581,19 +633,21 @@ export default function RouteBuilderScreen() {
         {/* Botão otimizar */}
         <button
           onClick={handleOptimize}
-          disabled={optimizing || selected.size === 0 || !motoboyId}
+          disabled={optimizing || selected.size === 0 || !motoboyId || !storeId}
           style={{
             width: "100%",
             padding: "14px",
             borderRadius: 13,
             background:
-              selected.size > 0 && motoboyId ? colors.rosa : "#d1d5db",
+              selected.size > 0 && motoboyId && storeId
+                ? colors.rosa
+                : "#d1d5db",
             color: "#fff",
             border: "none",
             fontSize: 14,
             fontWeight: 700,
             cursor:
-              selected.size > 0 && motoboyId && !optimizing
+              selected.size > 0 && motoboyId && storeId && !optimizing
                 ? "pointer"
                 : "not-allowed",
             fontFamily: "'Space Grotesk', sans-serif",
@@ -601,7 +655,6 @@ export default function RouteBuilderScreen() {
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
-            transition: "background 0.2s",
           }}
         >
           {optimizing ? (

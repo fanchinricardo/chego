@@ -309,7 +309,7 @@ export default function App() {
             <Route
               path="/store/orders/:id"
               element={
-                <PrivateRoute allowedRoles={["store"]}>
+                <PrivateRoute allowedRoles={["store", "balcao"]}>
                   <OrderDetailScreen />
                 </PrivateRoute>
               }
@@ -504,7 +504,7 @@ export default function App() {
             <Route
               path="/store/route"
               element={
-                <PrivateRoute allowedRoles={["store"]}>
+                <PrivateRoute allowedRoles={["store", "balcao"]}>
                   <RouteScreen />
                 </PrivateRoute>
               }
@@ -520,7 +520,7 @@ export default function App() {
             <Route
               path="/store/route/confirm"
               element={
-                <PrivateRoute allowedRoles={["store"]}>
+                <PrivateRoute allowedRoles={["store", "balcao"]}>
                   <RouteConfirmScreen />
                 </PrivateRoute>
               }
@@ -528,7 +528,7 @@ export default function App() {
             <Route
               path="/store/route/live/:id"
               element={
-                <PrivateRoute allowedRoles={["store"]}>
+                <PrivateRoute allowedRoles={["store", "balcao"]}>
                   <RouteLiveScreen />
                 </PrivateRoute>
               }

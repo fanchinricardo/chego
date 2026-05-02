@@ -4,7 +4,7 @@ import { supabase } from "../../lib/supabase";
 import { useStore } from "../../hooks/useStore";
 import { useAuth } from "../../contexts/AuthContext";
 import { colors, Spinner } from "../../components/ui";
-import { PDVTable } from "../../hooks/usePDV";
+import { PDVTable } from "../../hooks/usePdv";
 import { printReceipt, ReceiptData } from "../../components/ThermalReceipt";
 import Swal from "sweetalert2";
 

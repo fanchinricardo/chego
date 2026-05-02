@@ -59,8 +59,6 @@ export function ProductModal({
   const [halfSizes, setHalfSizes] = useState<ProductSizePrice[]>([]);
   const [halfSearch, setHalfSearch] = useState("");
 
-  
-
   const hasSizes = product.size_type === "sizes";
   const allowsHalf = product.allows_half === true; // defensivo contra null/undefined
 
@@ -186,7 +184,7 @@ export function ProductModal({
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
           ) : (
-            "🍕"
+            ""
           )}
           <button
             onClick={onClose}

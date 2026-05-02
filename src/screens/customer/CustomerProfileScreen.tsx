@@ -7,6 +7,97 @@ import { CustomerBottomNav } from "./CustomerBottomNav";
 import { LocationPicker } from "../../components/LocationPicker";
 import { supabase } from "../../lib/supabase";
 
+const EMPTY_ADDR = {
+  label: "Casa",
+  address: "",
+  city: "",
+  state: "",
+  zip_code: "",
+  complement: "",
+};
+
+// ── Fora do componente pai para evitar recriação a cada render,
+// o que causaria perda de foco nos inputs a cada digitação ──
+function AddrFormFields({
+  values,
+  onChange,
+}: {
+  values: typeof EMPTY_ADDR;
+  onChange: (f: typeof EMPTY_ADDR) => void;
+}) {
+  return (
+    <>
+      {/* Label */}
+      <div style={{ display: "flex", gap: 8 }}>
+        {["Casa", "Trabalho", "Outro"].map((l) => (
+          <button
+            key={l}
+            onClick={() => onChange({ ...values, label: l })}
+            style={{
+              flex: 1,
+              padding: "7px",
+              borderRadius: 9,
+              border: `1.5px solid ${values.label === l ? colors.rosa : colors.bordaLilas}`,
+              background: values.label === l ? "#fff0f8" : "#fff",
+              color: values.label === l ? colors.rosa : "#888",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            {l === "Casa" ? "🏠" : l === "Trabalho" ? "💼" : "📍"} {l}
+          </button>
+        ))}
+      </div>
+
+      <Input
+        label="Endereço *"
+        placeholder="Rua das Flores, 142"
+        value={values.address}
+        onChange={(e) => onChange({ ...values, address: e.target.value })}
+      />
+      <Input
+        label="Complemento"
+        placeholder="Ap 31, Bloco B..."
+        value={values.complement}
+        onChange={(e) => onChange({ ...values, complement: e.target.value })}
+      />
+      <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ flex: 2 }}>
+          <Input
+            label="Cidade *"
+            placeholder="Jundiaí"
+            value={values.city}
+            onChange={(e) => onChange({ ...values, city: e.target.value })}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <Input
+            label="UF *"
+            placeholder="SP"
+            value={values.state}
+            onChange={(e) =>
+              onChange({
+                ...values,
+                state: e.target.value.toUpperCase().slice(0, 2),
+              })
+            }
+            maxLength={2}
+          />
+        </div>
+      </div>
+      <Input
+        label="CEP *"
+        placeholder="00000-000"
+        value={values.zip_code}
+        onChange={(e) => onChange({ ...values, zip_code: e.target.value })}
+        inputMode="numeric"
+      />
+    </>
+  );
+}
+
 export default function CustomerProfileScreen() {
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
@@ -26,24 +117,75 @@ export default function CustomerProfileScreen() {
   const [toast, setToast] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
 
+  // ── Novo: qual endereço está sendo editado ──
+  const [editingAddrId, setEditingAddrId] = useState<string | null>(null);
+  const [editAddrForm, setEditAddrForm] = useState({ ...EMPTY_ADDR });
+
   const [form, setForm] = useState({
     full_name: profile?.full_name ?? "",
     phone: profile?.phone ?? "",
   });
 
-  const [addrForm, setAddrForm] = useState({
-    label: "Casa",
-    address: "",
-    city: "",
-    state: "",
-    zip_code: "",
-    complement: "",
-  });
+  const [addrForm, setAddrForm] = useState({ ...EMPTY_ADDR });
 
   function showToast(msg: string, type: "success" | "error" = "success") {
     setToast(msg);
     setToastType(type);
     setTimeout(() => setToast(""), 3000);
+  }
+
+  function openEditAddr(addr: any) {
+    setEditingAddrId(addr.id);
+    setEditAddrForm({
+      label: addr.label ?? "Casa",
+      address: addr.address ?? "",
+      city: addr.city ?? "",
+      state: addr.state ?? "",
+      zip_code: addr.zip_code ?? "",
+      complement: addr.complement ?? "",
+    });
+    // Fecha o formulário de novo endereço se estiver aberto
+    setShowAddAddr(false);
+  }
+
+  function closeEditAddr() {
+    setEditingAddrId(null);
+    setEditAddrForm({ ...EMPTY_ADDR });
+  }
+
+  async function handleUpdateAddress() {
+    if (
+      !editAddrForm.address ||
+      !editAddrForm.city ||
+      !editAddrForm.state ||
+      !editAddrForm.zip_code
+    ) {
+      showToast("Preencha todos os campos obrigatórios", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("customer_addresses")
+        .update({
+          label: editAddrForm.label,
+          address: editAddrForm.address.trim(),
+          city: editAddrForm.city.trim(),
+          state: editAddrForm.state.trim().toUpperCase().slice(0, 2),
+          zip_code: editAddrForm.zip_code.replace(/\D/g, ""),
+          complement: editAddrForm.complement.trim() || null,
+        })
+        .eq("id", editingAddrId!);
+
+      if (error) throw new Error(error.message);
+      showToast("Endereço atualizado!");
+      closeEditAddr();
+      refetch();
+    } catch (err: any) {
+      showToast(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleLocationConfirm(lat: number, lng: number) {
@@ -109,16 +251,8 @@ export default function CustomerProfileScreen() {
 
       showToast("Endereço salvo! Agora marque no mapa.");
       setShowAddAddr(false);
-      setAddrForm({
-        label: "Casa",
-        address: "",
-        city: "",
-        state: "",
-        zip_code: "",
-        complement: "",
-      });
+      setAddrForm({ ...EMPTY_ADDR });
 
-      // Abre o mapa para o cliente marcar a localização
       if (data?.id) {
         setPendingAddrId(data.id);
         setShowMap(true);
@@ -145,6 +279,7 @@ export default function CustomerProfileScreen() {
       .join("")
       .toUpperCase() ?? "?";
 
+  // Componente interno do formulário de endereço (reaproveitado nos dois casos)
   return (
     <div
       style={{
@@ -347,7 +482,11 @@ export default function CustomerProfileScreen() {
                 Meus endereços
               </p>
               <button
-                onClick={() => setShowAddAddr((a) => !a)}
+                onClick={() => {
+                  setShowAddAddr((a) => !a);
+                  // Fecha edição se abrir novo
+                  if (!showAddAddr) closeEditAddr();
+                }}
                 style={{
                   background: "none",
                   border: "none",
@@ -382,115 +521,229 @@ export default function CustomerProfileScreen() {
                   </div>
                 )}
 
-                {addresses.map((addr, i) => (
-                  <div
-                    key={addr.id}
-                    style={{
-                      padding: "11px 16px",
-                      borderBottom: `1px solid ${colors.fundo}`,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                    }}
-                  >
+                {addresses.map((addr) => (
+                  <div key={addr.id}>
+                    {/* ── Linha do endereço ── */}
                     <div
                       style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 9,
-                        background: addr.is_default
-                          ? "#fff0f8"
-                          : colors.lilasClaro,
+                        padding: "11px 16px",
+                        borderBottom: `1px solid ${colors.fundo}`,
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 16,
-                        flexShrink: 0,
+                        gap: 10,
                       }}
                     >
-                      {addr.label === "Casa"
-                        ? "🏠"
-                        : addr.label === "Trabalho"
-                          ? "💼"
-                          : "📍"}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 9,
+                          background: addr.is_default
+                            ? "#fff0f8"
+                            : colors.lilasClaro,
                           display: "flex",
                           alignItems: "center",
-                          gap: 6,
+                          justifyContent: "center",
+                          fontSize: 16,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {addr.label === "Casa"
+                          ? "🏠"
+                          : addr.label === "Trabalho"
+                            ? "💼"
+                            : "📍"}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: colors.noite,
+                            }}
+                          >
+                            {addr.label}
+                          </p>
+                          {addr.is_default && (
+                            <span
+                              style={{
+                                fontSize: 9,
+                                fontWeight: 700,
+                                color: colors.rosa,
+                                background: "#fff0f8",
+                                padding: "1px 6px",
+                                borderRadius: 8,
+                              }}
+                            >
+                              padrão
+                            </span>
+                          )}
+                        </div>
+                        <p
+                          style={{
+                            fontSize: 11,
+                            color: "#888",
+                            marginTop: 1,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {addr.address} · {addr.city}
+                        </p>
+                      </div>
+
+                      {/* Ações */}
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        {/* Editar endereço */}
+                        <button
+                          onClick={() =>
+                            editingAddrId === addr.id
+                              ? closeEditAddr()
+                              : openEditAddr(addr)
+                          }
+                          style={{
+                            background:
+                              editingAddrId === addr.id
+                                ? "#fff0f8"
+                                : colors.lilasClaro,
+                            border: "none",
+                            borderRadius: 7,
+                            width: 28,
+                            height: 28,
+                            fontSize: 13,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                          title="Editar endereço"
+                        >
+                          ✏️
+                        </button>
+
+                        {/* Marcar no mapa */}
+                        <button
+                          onClick={() => {
+                            setPendingAddrId(addr.id);
+                            setShowMap(true);
+                          }}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: addr.lat ? "#15803d" : "#aaa",
+                            fontSize: 16,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 28,
+                            height: 28,
+                          }}
+                          title={
+                            addr.lat
+                              ? "Atualizar localização"
+                              : "Marcar no mapa"
+                          }
+                        >
+                          {addr.lat ? "📍" : "🗺️"}
+                        </button>
+
+                        {/* Definir como padrão */}
+                        {!addr.is_default && (
+                          <button
+                            onClick={() => setDefault(addr.id)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#bbb",
+                              fontSize: 11,
+                              cursor: "pointer",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            Padrão
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ── Formulário inline de edição ── */}
+                    {editingAddrId === addr.id && (
+                      <div
+                        style={{
+                          padding: "14px 16px",
+                          borderBottom: `1px solid ${colors.bordaLilas}`,
+                          borderTop: `1px solid ${colors.bordaLilas}`,
+                          background: "#fafafa",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 10,
                         }}
                       >
                         <p
                           style={{
-                            fontSize: 12,
+                            fontSize: 10,
                             fontWeight: 700,
-                            color: colors.noite,
+                            color: "#aaa",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            marginBottom: 2,
                           }}
                         >
-                          {addr.label}
+                          Editar endereço
                         </p>
-                        {addr.is_default && (
-                          <span
+
+                        <AddrFormFields
+                          values={editAddrForm}
+                          onChange={setEditAddrForm}
+                        />
+
+                        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                          <button
+                            onClick={closeEditAddr}
                             style={{
-                              fontSize: 9,
-                              fontWeight: 700,
-                              color: colors.rosa,
-                              background: "#fff0f8",
-                              padding: "1px 6px",
-                              borderRadius: 8,
+                              flex: 1,
+                              padding: "10px",
+                              borderRadius: 10,
+                              border: `1px solid ${colors.bordaLilas}`,
+                              background: "#fff",
+                              color: colors.noite,
+                              fontSize: 13,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              fontFamily: "'Space Grotesk', sans-serif",
                             }}
                           >
-                            padrão
-                          </span>
-                        )}
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={handleUpdateAddress}
+                            disabled={saving}
+                            style={{
+                              flex: 2,
+                              padding: "10px",
+                              borderRadius: 10,
+                              border: "none",
+                              background: saving ? "#ccc" : colors.rosa,
+                              color: "#fff",
+                              fontSize: 13,
+                              fontWeight: 700,
+                              cursor: saving ? "not-allowed" : "pointer",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            {saving ? "Salvando..." : "Salvar alterações"}
+                          </button>
+                        </div>
                       </div>
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: "#888",
-                          marginTop: 1,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {addr.address} · {addr.city}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setPendingAddrId(addr.id);
-                        setShowMap(true);
-                      }}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: addr.lat ? "#15803d" : "#aaa",
-                        fontSize: 11,
-                        cursor: "pointer",
-                        fontFamily: "'Space Grotesk', sans-serif",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {addr.lat ? "📍" : "🗺️"}
-                    </button>
-                    {!addr.is_default && (
-                      <button
-                        onClick={() => setDefault(addr.id)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "#bbb",
-                          fontSize: 11,
-                          cursor: "pointer",
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          flexShrink: 0,
-                        }}
-                      >
-                        Padrão
-                      </button>
                     )}
                   </div>
                 ))}
@@ -506,88 +759,20 @@ export default function CustomerProfileScreen() {
                       gap: 10,
                     }}
                   >
-                    {/* Label */}
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {["Casa", "Trabalho", "Outro"].map((l) => (
-                        <button
-                          key={l}
-                          onClick={() =>
-                            setAddrForm((f) => ({ ...f, label: l }))
-                          }
-                          style={{
-                            flex: 1,
-                            padding: "7px",
-                            borderRadius: 9,
-                            border: `1.5px solid ${addrForm.label === l ? colors.rosa : colors.bordaLilas}`,
-                            background:
-                              addrForm.label === l ? "#fff0f8" : "#fff",
-                            color: addrForm.label === l ? colors.rosa : "#888",
-                            fontSize: 12,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            fontFamily: "'Space Grotesk', sans-serif",
-                          }}
-                        >
-                          {l === "Casa" ? "🏠" : l === "Trabalho" ? "💼" : "📍"}{" "}
-                          {l}
-                        </button>
-                      ))}
-                    </div>
+                    <p
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "#aaa",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        marginBottom: 2,
+                      }}
+                    >
+                      Novo endereço
+                    </p>
 
-                    <Input
-                      label="Endereço *"
-                      placeholder="Rua das Flores, 142"
-                      value={addrForm.address}
-                      onChange={(e) =>
-                        setAddrForm((f) => ({ ...f, address: e.target.value }))
-                      }
-                    />
-                    <Input
-                      label="Complemento"
-                      placeholder="Ap 31, Bloco B..."
-                      value={addrForm.complement}
-                      onChange={(e) =>
-                        setAddrForm((f) => ({
-                          ...f,
-                          complement: e.target.value,
-                        }))
-                      }
-                    />
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <div style={{ flex: 2 }}>
-                        <Input
-                          label="Cidade *"
-                          placeholder="Jundiaí"
-                          value={addrForm.city}
-                          onChange={(e) =>
-                            setAddrForm((f) => ({ ...f, city: e.target.value }))
-                          }
-                        />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <Input
-                          label="UF *"
-                          placeholder="SP"
-                          value={addrForm.state}
-                          onChange={(e) =>
-                            setAddrForm((f) => ({
-                              ...f,
-                              state: e.target.value.toUpperCase().slice(0, 2),
-                            }))
-                          }
-                          maxLength={2}
-                        />
-                      </div>
-                    </div>
-                    <Input
-                      label="CEP *"
-                      placeholder="00000-000"
-                      value={addrForm.zip_code}
-                      onChange={(e) =>
-                        setAddrForm((f) => ({ ...f, zip_code: e.target.value }))
-                      }
-                      inputMode="numeric"
-                    />
+                    <AddrFormFields values={addrForm} onChange={setAddrForm} />
 
                     <Button
                       variant="primary"

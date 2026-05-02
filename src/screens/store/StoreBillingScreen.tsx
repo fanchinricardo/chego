@@ -36,7 +36,12 @@ export default function StoreBillingScreen() {
     salesTotal: number;
     dueDay: number;
   } | null>(null);
+  // ── Novo: controla qual fatura está com o modal de cartão aberto ──
+  const [cardInvoice, setCardInvoice] = useState<Invoice | null>(null);
+
   const pollingRef = useRef<any>(null);
+  // ── Novo: referência ao Brick montado (para unmount ao fechar) ──
+  const brickRef = useRef<any>(null);
 
   function showToast(msg: string, type: "success" | "error" = "success") {
     setToast(msg);
@@ -51,7 +56,6 @@ export default function StoreBillingScreen() {
     return () => clearInterval(pollingRef.current);
   }, [store]);
 
-  // Polling automático — verifica a cada 5s faturas pendentes com payment_id
   useEffect(() => {
     const pending = invoices.filter(
       (i) => (i.status === "pending" || i.status === "overdue") && i.payment_id,
@@ -69,10 +73,100 @@ export default function StoreBillingScreen() {
     return () => clearInterval(pollingRef.current);
   }, [invoices.map((i) => i.id + i.status + i.payment_id).join(",")]);
 
+  // ── Novo: inicializa o CardPayment Brick do MP dentro do modal ──
+  // preferenceId removido — o cardPayment Brick só precisa do amount.
+  // preferenceId é exclusivo do Checkout Pro (abre nova aba) e causa o erro
+  // "There is no valid payment type for this amount" quando passado aqui.
+  async function initCardBrick(invoice: Invoice) {
+    try {
+      const mp = new (window as any).MercadoPago(
+        import.meta.env.VITE_MP_PUBLIC_KEY,
+        { locale: "pt-BR" },
+      );
+      const bricks = mp.bricks();
+
+      // Se já existia um brick montado, desmonta antes
+      if (brickRef.current) {
+        await brickRef.current.unmount();
+        brickRef.current = null;
+      }
+
+      brickRef.current = await bricks.create(
+        "cardPayment",
+        "card-brick-container",
+        {
+          initialization: {
+            // Apenas amount — NÃO passar preferenceId aqui
+            amount: Number(invoice.amount),
+          },
+          customization: {
+            paymentMethods: { maxInstallments: 12 },
+            visual: { hideFormTitle: true },
+          },
+          callbacks: {
+            onReady: () => {},
+            onSubmit: async (formData: any) => {
+              try {
+                // Envia os dados do cartão para a Edge Function processar
+                const res = await callBilling({
+                  action: "process_card",
+                  invoice_id: invoice.id,
+                  store_id: store?.id ?? "",
+                  payment_data: JSON.stringify(formData),
+                });
+
+                if (res.paid) {
+                  showToast("✅ Pagamento aprovado! Loja ativada!");
+                  setCardInvoice(null);
+                  if (store?.id) {
+                    await supabase
+                      .from("stores")
+                      .update({ active: true })
+                      .eq("id", store.id);
+                  }
+                  await fetchInvoices();
+                } else {
+                  showToast(
+                    res.error ?? "Pagamento recusado pela operadora",
+                    "error",
+                  );
+                }
+              } catch (err: any) {
+                showToast(
+                  err.message ?? "Erro ao processar pagamento",
+                  "error",
+                );
+              }
+            },
+            onError: (err: any) => {
+              showToast(
+                err?.message ?? "Erro no formulário de cartão",
+                "error",
+              );
+            },
+          },
+        },
+      );
+    } catch (err: any) {
+      showToast("Erro ao carregar formulário de cartão", "error");
+      console.error(err);
+    }
+  }
+
+  // ── Fecha o modal de cartão e desmonta o brick ──
+  async function closeCardModal() {
+    if (brickRef.current) {
+      try {
+        await brickRef.current.unmount();
+      } catch (_) {}
+      brickRef.current = null;
+    }
+    setCardInvoice(null);
+  }
+
   async function fetchNextInvoice() {
     if (!store) return;
 
-    // Busca config do admin E taxas customizadas da loja
     const [{ data: config }, { data: storeData }] = await Promise.all([
       supabase.from("admin_config").select("monthly_pct, due_day").single(),
       supabase
@@ -83,7 +177,6 @@ export default function StoreBillingScreen() {
     ]);
     if (!config) return;
 
-    // Calcula vendas do mês atual
     const now = new Date();
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     const { data: orders } = await supabase
@@ -106,7 +199,6 @@ export default function StoreBillingScreen() {
       ...(pdvOrders ?? []).map((o) => Number(o.total)),
     ].reduce((s, v) => s + v, 0);
 
-    // Usa taxas customizadas se existirem
     const billingType = storeData?.billing_type ?? "pct";
     const customFixed = storeData?.custom_monthly_fee;
     const customPct = storeData?.custom_monthly_pct;
@@ -129,7 +221,7 @@ export default function StoreBillingScreen() {
       dueDay: config.due_day,
       billingType,
       customFixed: customFixed ? Number(customFixed) : null,
-    });
+    } as any);
   }
 
   async function fetchInvoices() {
@@ -140,7 +232,7 @@ export default function StoreBillingScreen() {
       .select("*")
       .eq("store_id", store.id)
       .order("created_at", { ascending: false });
-    // Marca como overdue e bloqueia loja se passou do vencimento
+
     const now = new Date();
     for (const inv of data ?? []) {
       if (
@@ -201,24 +293,11 @@ export default function StoreBillingScreen() {
     }
   }
 
-  async function handleCheckout(invoice: Invoice) {
-    setGenerating(invoice.id + "_card");
-    try {
-      const data = await callBilling({
-        action: "generate_checkout",
-        invoice_id: invoice.id,
-        store_id: store?.id ?? "",
-      });
-      if (data.error) throw new Error(data.error);
-      // Abre link do MP em nova aba
-      window.open(data.checkout_url, "_blank");
-      // Polling para verificar pagamento
-      startPolling(invoice.id);
-    } catch (err: any) {
-      showToast(err.message, "error");
-    } finally {
-      setGenerating(null);
-    }
+  // Abre o modal direto — o cardPayment Brick não precisa de preferência prévia
+  function handleCheckout(invoice: Invoice) {
+    setCardInvoice(invoice);
+    // 300ms para o DOM montar o #card-brick-container antes de inicializar o Brick
+    setTimeout(() => initCardBrick(invoice), 300);
   }
 
   async function handleGenerateQR(invoice: Invoice) {
@@ -232,7 +311,6 @@ export default function StoreBillingScreen() {
       if (data.error) throw new Error(data.error);
       showToast("QR Code gerado!");
       await fetchInvoices();
-      // Re-fetch após 1s para garantir dados atualizados
       setTimeout(() => fetchInvoices(), 1000);
       startPolling(invoice.id);
     } catch (err: any) {
@@ -252,7 +330,6 @@ export default function StoreBillingScreen() {
   async function checkPayment(invoiceId: string) {
     if (!store) return;
     try {
-      // Verifica status direto no MP via Edge Function
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -438,7 +515,7 @@ export default function StoreBillingScreen() {
           gap: 12,
         }}
       >
-        {/* ── Card próxima fatura estimada ── */}
+        {/* Card próxima fatura estimada */}
         {nextInvoice && (
           <div
             style={{
@@ -471,13 +548,13 @@ export default function StoreBillingScreen() {
                 <p style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
                   Vendas este mês:{" "}
                   <strong style={{ color: colors.noite }}>
-                    R$ {nextInvoice.salesTotal.toFixed(2)}
+                    R$ {(nextInvoice as any).salesTotal.toFixed(2)}
                   </strong>
                 </p>
                 <p style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
-                  {nextInvoice.pct}% sobre vendas → vence dia{" "}
+                  {(nextInvoice as any).pct}% sobre vendas → vence dia{" "}
                   <strong style={{ color: colors.noite }}>
-                    {nextInvoice.dueDay}
+                    {(nextInvoice as any).dueDay}
                   </strong>
                 </p>
                 <p style={{ fontSize: 10, color: "#aaa" }}>
@@ -493,7 +570,7 @@ export default function StoreBillingScreen() {
                     lineHeight: 1,
                   }}
                 >
-                  R$ {nextInvoice.amount.toFixed(2)}
+                  R$ {(nextInvoice as any).amount.toFixed(2)}
                 </p>
                 <p style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>
                   estimativa
@@ -514,7 +591,12 @@ export default function StoreBillingScreen() {
                   height: "100%",
                   background: colors.rosa,
                   borderRadius: 4,
-                  width: `${Math.min((nextInvoice.salesTotal / Math.max(nextInvoice.salesTotal * 2, 1)) * 100, 100)}%`,
+                  width: `${Math.min(
+                    ((nextInvoice as any).salesTotal /
+                      Math.max((nextInvoice as any).salesTotal * 2, 1)) *
+                      100,
+                    100,
+                  )}%`,
                   transition: "width 0.5s",
                 }}
               />
@@ -550,7 +632,13 @@ export default function StoreBillingScreen() {
               style={{
                 background: "#fff",
                 borderRadius: 14,
-                border: `1.5px solid ${inv.status === "overdue" ? "#fca5a5" : inv.status === "paid" ? "#86efac" : colors.bordaLilas}`,
+                border: `1.5px solid ${
+                  inv.status === "overdue"
+                    ? "#fca5a5"
+                    : inv.status === "paid"
+                      ? "#86efac"
+                      : colors.bordaLilas
+                }`,
                 overflow: "hidden",
               }}
             >
@@ -615,7 +703,13 @@ export default function StoreBillingScreen() {
                           : inv.status === "overdue"
                             ? "#dc2626"
                             : "#b45309",
-                      border: `1px solid ${inv.status === "paid" ? "#86efac" : inv.status === "overdue" ? "#fca5a5" : "#fcd34d"}`,
+                      border: `1px solid ${
+                        inv.status === "paid"
+                          ? "#86efac"
+                          : inv.status === "overdue"
+                            ? "#fca5a5"
+                            : "#fcd34d"
+                      }`,
                     }}
                   >
                     {inv.status === "paid"
@@ -695,6 +789,8 @@ export default function StoreBillingScreen() {
                       ? "⏳ Gerando..."
                       : "🔄 Gerar novo QR Code"}
                   </button>
+
+                  {/* ── Botão cartão agora abre o modal inline ── */}
                   <button
                     onClick={() => handleCheckout(inv)}
                     disabled={!!generating}
@@ -715,6 +811,7 @@ export default function StoreBillingScreen() {
                       ? "⏳ Abrindo..."
                       : "💳 Pagar com Cartão de Crédito"}
                   </button>
+
                   <button
                     onClick={async () => {
                       const data = await callBilling({
@@ -767,7 +864,7 @@ export default function StoreBillingScreen() {
                 </div>
               )}
 
-              {/* Botão gerar QR */}
+              {/* Botão gerar QR (sem QR ainda) */}
               {inv.status !== "paid" && !inv.qr_code_base64 && (
                 <div style={{ padding: "0 16px 12px" }}>
                   <div
@@ -795,6 +892,8 @@ export default function StoreBillingScreen() {
                         ? "⏳ Gerando..."
                         : "📱 Pagar com Pix"}
                     </button>
+
+                    {/* ── Botão cartão agora abre o modal inline ── */}
                     <button
                       onClick={() => handleCheckout(inv)}
                       disabled={!!generating}
@@ -833,6 +932,97 @@ export default function StoreBillingScreen() {
           ))
         )}
       </div>
+
+      {/* ── Modal de pagamento com cartão (CardPayment Brick) ── */}
+      {cardInvoice && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            zIndex: 999,
+            display: "flex",
+            alignItems: "flex-end",
+          }}
+          onClick={(e) => {
+            // Fecha ao clicar fora do painel
+            if (e.target === e.currentTarget) closeCardModal();
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "20px 20px 0 0",
+              padding: "20px 16px 40px",
+              width: "100%",
+              maxHeight: "90dvh",
+              overflowY: "auto",
+            }}
+          >
+            {/* Cabeçalho do modal */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
+              <div>
+                <p
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 15,
+                    color: "#1a1a2e",
+                    margin: 0,
+                  }}
+                >
+                  💳 Pagar com Cartão
+                </p>
+                <p style={{ fontSize: 12, color: "#888", margin: "2px 0 0" }}>
+                  {cardInvoice.type === "signup"
+                    ? "Taxa de adesão"
+                    : `Mensalidade ${formatRef(cardInvoice.reference)}`}{" "}
+                  — R$ {Number(cardInvoice.amount).toFixed(2)}
+                </p>
+              </div>
+              <button
+                onClick={closeCardModal}
+                style={{
+                  background: "#f3f4f6",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: 32,
+                  height: 32,
+                  fontSize: 16,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#555",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Container onde o Brick do MP é montado */}
+            <div id="card-brick-container" />
+
+            <p
+              style={{
+                fontSize: 10,
+                color: "#aaa",
+                textAlign: "center",
+                marginTop: 12,
+              }}
+            >
+              Pagamento processado com segurança pelo Mercado Pago
+            </p>
+          </div>
+        </div>
+      )}
 
       {toast && <Toast message={toast} type={toastType} />}
     </div>

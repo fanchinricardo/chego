@@ -116,6 +116,18 @@ export function useRoutes(storeId: string | null) {
       .select("*")
       .single();
 
+    console.log("INSERT delivery_routes resultado:", {
+      route,
+      error: routeErr
+        ? {
+            message: routeErr.message,
+            code: routeErr.code,
+            details: (routeErr as any).details,
+            hint: (routeErr as any).hint,
+          }
+        : null,
+    });
+
     if (routeErr)
       throw new Error(
         `Erro ao criar rota: ${routeErr.message} (${routeErr.code})`,
