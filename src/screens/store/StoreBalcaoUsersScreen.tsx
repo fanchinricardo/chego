@@ -8,8 +8,8 @@ import Swal from "sweetalert2";
 interface BalcaoUser {
   id: string;
   full_name: string;
-  email: string;
-  active: boolean;
+  email: string | null;
+  phone: string | null;
 }
 
 export default function StoreBalcaoUsersScreen() {
@@ -31,15 +31,29 @@ export default function StoreBalcaoUsersScreen() {
 
   const fetchUsers = useCallback(async () => {
     if (!store?.id) return;
-    console.log("[Balcao] store.id:", store.id);
+
+    // email não existe em profiles por padrão — seleciona sem ele
+    // se a coluna foi adicionada via migration, aparece automaticamente
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name, email, active")
+      .select("id, full_name, email, phone")
       .eq("role", "balcao")
       .eq("store_id", store.id)
       .order("full_name");
-    console.log("[Balcao] data:", data, "error:", error);
-    setUsers((data ?? []) as BalcaoUser[]);
+
+    if (error) {
+      // Fallback: se coluna email não existir, busca sem ela
+      const { data: dataNoEmail } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, phone")
+        .eq("role", "balcao")
+        .eq("store_id", store.id)
+        .order("full_name");
+      setUsers((dataNoEmail ?? []) as BalcaoUser[]);
+    } else {
+      setUsers((data ?? []) as BalcaoUser[]);
+    }
+
     setLoading(false);
   }, [store?.id]);
 
@@ -92,11 +106,7 @@ export default function StoreBalcaoUsersScreen() {
   }
 
   async function handleToggle(user: BalcaoUser) {
-    await supabase
-      .from("profiles")
-      .update({ active: !user.active })
-      .eq("id", user.id);
-    await fetchUsers();
+    // coluna active não existe em profiles — funcionalidade removida
   }
 
   async function handleDelete(user: BalcaoUser) {
@@ -125,6 +135,7 @@ export default function StoreBalcaoUsersScreen() {
         body: JSON.stringify({ user_id: user.id }),
       },
     );
+
     await fetchUsers();
   }
 
@@ -319,7 +330,7 @@ export default function StoreBalcaoUsersScreen() {
                   width: 38,
                   height: 38,
                   borderRadius: "50%",
-                  background: user.active ? colors.lilasClaro : "#f0f0f0",
+                  background: colors.lilasClaro,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -334,37 +345,14 @@ export default function StoreBalcaoUsersScreen() {
                 >
                   {user.full_name}
                 </p>
-                <p style={{ fontSize: 11, color: "#aaa" }}>{user.email}</p>
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    background: user.active ? "#f0fdf4" : "#f5f5f5",
-                    color: user.active ? "#15803d" : "#888",
-                    borderRadius: 8,
-                    padding: "2px 8px",
-                  }}
-                >
-                  {user.active ? "✅ Ativo" : "⏸ Inativo"}
-                </span>
+                <p style={{ fontSize: 11, color: "#aaa" }}>
+                  {user.email ?? "—"}
+                </p>
+                {user.phone && (
+                  <p style={{ fontSize: 11, color: "#aaa" }}>{user.phone}</p>
+                )}
               </div>
               <div style={{ display: "flex", gap: 6 }}>
-                <button
-                  onClick={() => handleToggle(user)}
-                  style={{
-                    padding: "6px 10px",
-                    borderRadius: 8,
-                    border: `1px solid ${colors.bordaLilas}`,
-                    background: "#fff",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    color: user.active ? "#b45309" : "#15803d",
-                    fontFamily: "'Space Grotesk', sans-serif",
-                  }}
-                >
-                  {user.active ? "Pausar" : "Ativar"}
-                </button>
                 <button
                   onClick={() => handleDelete(user)}
                   style={{
