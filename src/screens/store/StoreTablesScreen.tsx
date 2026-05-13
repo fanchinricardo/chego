@@ -173,7 +173,50 @@ export default function StoreTablesScreen() {
       setSaving(false);
     }
   }
+  async function openQR(table: PDVTableWithQR) {
+    setQrTable(table);
+    const base = window.location.origin;
+    const urlConsumption = `${base}/mesa/${table.qr_token}`;
+    const url1 = await QRCode.toDataURL(urlConsumption, {
+      width: 500, // Aumentei a resolução para a impressão não sair serrilhada
+      margin: 2,
+    });
+    setQrDataUrl(url1);
+  }
 
+  // Adicione esta nova função para lidar com a impressão
+  function handlePrint() {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const tableName = qrTable?.name ?? `Mesa ${qrTable?.number}`;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Imprimir QR Code - ${tableName}</title>
+          <style>
+            body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+            h1 { margin-bottom: 20px; font-size: 24px; }
+            img { width: 300px; height: 300px; }
+            p { margin-top: 20px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <h1>${tableName}</h1>
+          <img src="${qrDataUrl}" />
+          <p>Escaneie para ver o consumo e chamar o garçom</p>
+          <script>
+            setTimeout(() => {
+              window.print();
+              window.close();
+            }, 500);
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  }
   const STATUS_COLOR: Record<string, string> = {
     available: "#22c55e",
     occupied: colors.rosa,
@@ -597,31 +640,56 @@ export default function StoreTablesScreen() {
               Imprima ou exiba este QR Code na mesa
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              {/* QR consumo */}
-              <div style={{ textAlign: "center" }}>
-                <p
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: colors.noite,
-                    marginBottom: 10,
-                  }}
-                >
-                  📋 Ver consumo + Chamar garçom
-                </p>
-                {qrDataUrl && (
+            {/* QR consumo */}
+            <div style={{ textAlign: "center" }}>
+              <p
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: colors.noite,
+                  marginBottom: 10,
+                }}
+              >
+                📋 Ver consumo + Chamar garçom
+              </p>
+              {qrDataUrl && (
+                <>
                   <img
+                    id="qr-image-print"
                     src={qrDataUrl}
-                    style={{ width: 180, height: 180, borderRadius: 12 }}
+                    style={{
+                      width: 180,
+                      height: 180,
+                      borderRadius: 12,
+                      border: "1px solid #eee",
+                    }}
                   />
-                )}
-                <p style={{ fontSize: 10, color: "#aaa", marginTop: 6 }}>
-                  {window.location.origin}/mesa/{qrTable.qr_token}
-                </p>
-              </div>
-            </div>
 
+                  {/* BOTÃO DE IMPRIMIR ADICIONADO AQUI */}
+                  <button
+                    onClick={handlePrint}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      margin: "16px auto 0",
+                      padding: "10px 20px",
+                      borderRadius: 10,
+                      background: colors.lilasClaro,
+                      color: "#7e22ce",
+                      border: "none",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    🖨️ Imprimir QR Code
+                  </button>
+                </>
+              )}
+            </div>
             <button
               onClick={() => setQrTable(null)}
               style={{

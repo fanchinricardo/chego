@@ -357,6 +357,11 @@ export default function StoreProfileScreen() {
           >
             {[
               {
+                icon: "🍽️",
+                label: "Cardápio do Dia",
+                path: "/store/daily-menu",
+              },
+              {
                 icon: "🕐",
                 label: "Horário de funcionamento",
                 path: "/store/schedule",

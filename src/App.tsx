@@ -25,6 +25,7 @@ import StoreSetupScreen from "./screens/store/StoreSetupScreen";
 import StoreMpConfigScreen from "./screens/store/StoreMpConfigScreen";
 import StoreMotoboyScreen from "./screens/store/StoreMotoboyScreen";
 import StoreScheduleScreen from "./screens/store/StoreScheduleScreen";
+import StoreDailyMenuScreen from "./screens/store/StoreMenuScreen";
 import StoreChangeEmailScreen from "./screens/store/StoreChangeEmailScreen";
 import StoreSizesScreen from "./screens/store/StoreSizesScreen";
 import ProductSizePricesScreen from "./screens/store/ProductSizePricesScreen";
@@ -351,6 +352,14 @@ export default function App() {
               element={
                 <PrivateRoute allowedRoles={["store"]}>
                   <StoreScheduleScreen />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/store/daily-menu"
+              element={
+                <PrivateRoute allowedRoles={["store"]}>
+                  <StoreDailyMenuScreen />
                 </PrivateRoute>
               }
             />
