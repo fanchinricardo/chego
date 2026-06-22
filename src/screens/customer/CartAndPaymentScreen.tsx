@@ -7,7 +7,7 @@ import { useCart } from "../../contexts/CartContext";
 import { useCustomerAddresses } from "../../hooks/useCustomer";
 import { colors, Button, Spinner, Toast } from "../../components/ui";
 import { notify } from "../../services/whatsapp";
-import { getDistanceKm } from "../../services/routeOptimization";
+import { getDistanceKm } from "../../services/routing";
 
 function crc16(str: string): string {
   let crc = 0xffff;
