@@ -7,6 +7,7 @@ import { useCart } from "../../contexts/CartContext";
 import { useCustomerAddresses } from "../../hooks/useCustomer";
 import { colors, Button, Spinner, Toast } from "../../components/ui";
 import { notify } from "../../services/whatsapp";
+import { getDistanceKm } from "../../services/routeOptimization";
 
 function crc16(str: string): string {
   let crc = 0xffff;
@@ -50,7 +51,23 @@ export function CartScreen() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [paymentMethod, setPaymentMethod] = useState<string>("pix_qr");
   const [storePixKey, setStorePixKey] = useState<string | null>(null);
+
+  // ── Dados da loja relevantes para taxa de entrega ──
+  const [deliveryFeeMode, setDeliveryFeeMode] = useState<"fixed" | "per_km">(
+    "fixed",
+  );
+  const [pricePerKm, setPricePerKm] = useState<number>(0);
+  const [fixedDeliveryFee, setFixedDeliveryFee] = useState<number>(0);
+  const [storeLat, setStoreLat] = useState<number | null>(null);
+  const [storeLng, setStoreLng] = useState<number | null>(null);
+
+  // ── Taxa calculada (fixa ou por km) ──
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
+  const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(
+    null,
+  );
+  const [calculatingFee, setCalculatingFee] = useState(false);
+
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">(
     "delivery",
   );
@@ -66,21 +83,92 @@ export function CartScreen() {
     if (def && !selectedAddr) setSelectedAddr(def.id);
   }, [addresses]);
 
-  // Busca pix_key E delivery_fee da loja de uma vez
+  // Busca pix_key e configuração de taxa de entrega da loja de uma vez
   useEffect(() => {
     if (!storeId) return;
     supabase
       .from("stores")
-      .select("pix_key, delivery_fee")
+      .select(
+        "pix_key, delivery_fee, delivery_fee_mode, price_per_km, lat, lng",
+      )
       .eq("id", storeId)
       .maybeSingle()
       .then(({ data }) => {
         setStorePixKey(data?.pix_key ?? null);
-        setDeliveryFee(Number(data?.delivery_fee ?? 0));
+        setFixedDeliveryFee(Number(data?.delivery_fee ?? 0));
+        setDeliveryFeeMode(
+          data?.delivery_fee_mode === "per_km" ? "per_km" : "fixed",
+        );
+        setPricePerKm(Number(data?.price_per_km ?? 0));
+        setStoreLat(data?.lat ?? null);
+        setStoreLng(data?.lng ?? null);
       });
   }, [storeId]);
 
   const address = addresses.find((a) => a.id === selectedAddr);
+
+  // ── Calcula a taxa de entrega sempre que endereço/loja/modo mudarem ──
+  useEffect(() => {
+    if (deliveryType === "pickup") {
+      setDeliveryFee(0);
+      setDeliveryDistanceKm(null);
+      return;
+    }
+
+    // Modo fixo: usa o valor configurado direto, sem chamar API de distância
+    if (deliveryFeeMode === "fixed") {
+      setDeliveryFee(fixedDeliveryFee);
+      setDeliveryDistanceKm(null);
+      return;
+    }
+
+    // Modo por km: precisa de coordenadas da loja e do endereço selecionado
+    if (
+      !address?.lat ||
+      !address?.lng ||
+      storeLat == null ||
+      storeLng == null
+    ) {
+      setDeliveryFee(0);
+      setDeliveryDistanceKm(null);
+      return;
+    }
+
+    let cancelled = false;
+    setCalculatingFee(true);
+    getDistanceKm(
+      { lat: storeLat, lng: storeLng },
+      { lat: address.lat, lng: address.lng },
+    )
+      .then((km) => {
+        if (cancelled) return;
+        setDeliveryDistanceKm(km);
+        setDeliveryFee(Math.round(km * pricePerKm * 100) / 100);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Se a API de distância falhar totalmente, não cobra taxa
+        // (evita bloquear o pedido — comércio pode revisar manualmente)
+        setDeliveryFee(0);
+        setDeliveryDistanceKm(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCalculatingFee(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    deliveryType,
+    deliveryFeeMode,
+    fixedDeliveryFee,
+    pricePerKm,
+    storeLat,
+    storeLng,
+    address?.lat,
+    address?.lng,
+  ]);
 
   // Total real considerando tipo de entrega
   const orderDeliveryFee = deliveryType === "pickup" ? 0 : deliveryFee;
@@ -96,16 +184,22 @@ export function CartScreen() {
       showToast("Carrinho vazio", "error");
       return;
     }
+    if (deliveryType === "delivery" && calculatingFee) {
+      showToast("Calculando taxa de entrega, aguarde um instante...", "error");
+      return;
+    }
     if (submitting) return;
     setSubmitting(true);
     try {
       const { data: store } = await supabase
         .from("stores")
-        .select("delivery_fee, min_order_value, city")
+        .select("min_order_value, city")
         .eq("id", storeId)
         .single();
-      const delivFee =
-        deliveryType === "pickup" ? 0 : Number(store?.delivery_fee ?? 0);
+
+      // Usa a taxa já calculada no estado (fixa ou por km) — evita recalcular
+      // e garante consistência com o que foi exibido ao cliente.
+      const delivFee = deliveryType === "pickup" ? 0 : deliveryFee;
       const minOrder = Number(store?.min_order_value ?? 0);
       const subtotal = total;
       const finalTotal = subtotal + delivFee;
@@ -185,6 +279,8 @@ export function CartScreen() {
           payment_status: "pending",
           subtotal,
           delivery_fee: delivFee,
+          delivery_distance_km:
+            deliveryType === "delivery" ? deliveryDistanceKm : null,
           total: finalTotal,
           delivery_address:
             deliveryType === "pickup"
@@ -536,8 +632,9 @@ export function CartScreen() {
                 id: "delivery",
                 icon: "🛵",
                 label: "Entrega",
-                sub:
-                  deliveryFee > 0
+                sub: calculatingFee
+                  ? "Calculando taxa..."
+                  : deliveryFee > 0
                     ? `Taxa: R$ ${deliveryFee.toFixed(2)}`
                     : "Frete grátis",
               },
@@ -816,7 +913,7 @@ export function CartScreen() {
           </div>
         </div>
 
-        {/* ── Resumo — valores reais com delivery_fee da loja ── */}
+        {/* ── Resumo — valores reais com delivery_fee da loja (fixa ou por km) ── */}
         <div
           style={{
             background: "#fff",
@@ -844,7 +941,17 @@ export function CartScreen() {
               marginBottom: 8,
             }}
           >
-            <span style={{ fontSize: 12, color: "#888" }}>Entrega</span>
+            <span style={{ fontSize: 12, color: "#888" }}>
+              Entrega
+              {deliveryType === "delivery" &&
+                deliveryFeeMode === "per_km" &&
+                deliveryDistanceKm != null && (
+                  <span style={{ color: "#aaa" }}>
+                    {" "}
+                    ({deliveryDistanceKm.toFixed(1)} km)
+                  </span>
+                )}
+            </span>
             <span
               style={{
                 fontSize: 12,
@@ -856,9 +963,11 @@ export function CartScreen() {
             >
               {deliveryType === "pickup"
                 ? "Grátis (retirada)"
-                : deliveryFee > 0
-                  ? `R$ ${deliveryFee.toFixed(2)}`
-                  : "Grátis"}
+                : calculatingFee
+                  ? "Calculando..."
+                  : deliveryFee > 0
+                    ? `R$ ${deliveryFee.toFixed(2)}`
+                    : "Grátis"}
             </span>
           </div>
           <div
