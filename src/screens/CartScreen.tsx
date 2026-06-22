@@ -7,7 +7,7 @@ import { useCart } from "../../contexts/CartContext";
 import { useCustomerAddresses } from "../../hooks/useCustomer";
 import { colors, Button, Spinner, Toast } from "../../components/ui";
 import { notify } from "../../services/whatsapp";
-import { getDistanceKm } from "../../services/routeOptimization";
+import { getDistanceKm } from "../../services/routing";
 
 function crc16(str: string): string {
   let crc = 0xffff;
@@ -1018,6 +1018,739 @@ export function CartScreen() {
       </div>
 
       {toast && <Toast message={toast} type={toastType} />}
+    </div>
+  );
+}
+
+// ── PAGAMENTO ──────────────────────────────────────────────
+export function PaymentScreen() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { clearCart } = useCart();
+
+  const locationState = location.state as {
+    orderId: string;
+    total: number;
+    paymentMethod?: string;
+    pixKey?: string;
+  } | null;
+
+  const [status, setStatus] = useState<"waiting" | "paid" | "error">("waiting");
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [pixPayload, setPixPayload] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const orderId = locationState?.orderId ?? null;
+  const orderTotal = locationState?.total ?? 0;
+  const paymentMethod = locationState?.paymentMethod ?? "pix_qr";
+  const pixKey = locationState?.pixKey ?? null;
+
+  useEffect(() => {
+    if (!orderId || orderTotal <= 0) return;
+    if (paymentMethod !== "pix_qr" && paymentMethod !== "credito_mp") return;
+    setGenerating(true);
+    supabase.functions
+      .invoke("create-mp-payment", { body: { order_id: orderId } })
+      .then(({ data, error }) => {
+        if (error || data?.error) return;
+        if (data?.qr_code_base64)
+          setQrDataUrl(`data:image/png;base64,${data.qr_code_base64}`);
+        else if (data?.qr_code)
+          setQrDataUrl(
+            `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.qr_code)}&margin=10`,
+          );
+        if (data?.qr_code) setPixPayload(data.qr_code);
+      })
+      .finally(() => setGenerating(false));
+  }, [orderId, orderTotal]);
+
+  useEffect(() => {
+    if (!orderId || status !== "waiting") return;
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("payment_status")
+        .eq("id", orderId)
+        .single();
+      if (data?.payment_status === "paid") {
+        setStatus("paid");
+        clearCart();
+        clearInterval(interval);
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [orderId, status]);
+
+  useEffect(() => {
+    if (!orderId) return;
+    const channel = supabase
+      .channel(`payment-${orderId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "orders",
+          filter: `id=eq.${orderId}`,
+        },
+        (payload) => {
+          if ((payload.new as any).payment_status === "paid") {
+            setStatus("paid");
+            clearCart();
+          }
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orderId]);
+
+  // Pix manual
+  if (paymentMethod === "pix_manual" && status !== "paid") {
+    return (
+      <div
+        style={{
+          minHeight: "100dvh",
+          background: colors.fundo,
+          fontFamily: "'Space Grotesk', sans-serif",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          gap: 16,
+        }}
+      >
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: "50%",
+            background: colors.rosa,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 28,
+          }}
+        >
+          📋
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <p
+            style={{
+              fontFamily: "'Righteous', cursive",
+              fontSize: 22,
+              color: colors.noite,
+              marginBottom: 6,
+            }}
+          >
+            Pague via Pix
+          </p>
+          <p style={{ fontSize: 13, color: "#888", lineHeight: 1.7 }}>
+            Copie a chave Pix abaixo, abra seu banco e faça a transferência.
+          </p>
+        </div>
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 14,
+            border: `1.5px solid ${colors.bordaLilas}`,
+            padding: "16px",
+            width: "100%",
+            maxWidth: 360,
+          }}
+        >
+          <p
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: "#aaa",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              marginBottom: 8,
+            }}
+          >
+            Chave Pix
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <p
+              style={{
+                flex: 1,
+                fontSize: 15,
+                fontWeight: 700,
+                color: colors.noite,
+                wordBreak: "break-all",
+              }}
+            >
+              {pixKey ?? "Chave não configurada"}
+            </p>
+            {pixKey && (
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(pixKey);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  background: copied ? "#22c55e" : colors.rosa,
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                {copied ? "✓ Copiado!" : "Copiar"}
+              </button>
+            )}
+          </div>
+        </div>
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 13,
+            border: `1px solid ${colors.bordaLilas}`,
+            padding: "12px 16px",
+            width: "100%",
+            maxWidth: 360,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 13, color: "#888" }}>Total a pagar</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: colors.rosa }}>
+              R$ {orderTotal.toFixed(2)}
+            </span>
+          </div>
+          <p style={{ fontSize: 10, color: "#aaa", marginTop: 6 }}>
+            #{orderId?.slice(0, 8).toUpperCase()}
+          </p>
+        </div>
+        <div
+          style={{
+            background: "#fff8e6",
+            border: "1px solid #fcd34d",
+            borderRadius: 12,
+            padding: "10px 14px",
+            width: "100%",
+            maxWidth: 360,
+          }}
+        >
+          <p style={{ fontSize: 11, color: "#92400e", lineHeight: 1.6 }}>
+            ⏳ Após pagar, aguarde a confirmação do comércio.
+          </p>
+        </div>
+        <button
+          onClick={() => navigate(`/orders/${orderId}`)}
+          style={{
+            width: "100%",
+            maxWidth: 360,
+            padding: "13px",
+            borderRadius: 13,
+            background: colors.noite,
+            color: "#fff",
+            border: "none",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
+        >
+          Acompanhar pedido →
+        </button>
+        <button
+          onClick={() => navigate("/home")}
+          style={{
+            background: "none",
+            border: "none",
+            color: colors.rosa,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
+        >
+          Voltar para o início
+        </button>
+      </div>
+    );
+  }
+
+  // Pago
+  if (status === "paid") {
+    return (
+      <div
+        style={{
+          minHeight: "100dvh",
+          background: colors.fundo,
+          fontFamily: "'Space Grotesk', sans-serif",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          gap: 16,
+        }}
+      >
+        <div
+          style={{
+            width: 68,
+            height: 68,
+            borderRadius: "50%",
+            background: "#22c55e",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 30,
+            color: "#fff",
+          }}
+        >
+          ✓
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <p
+            style={{
+              fontFamily: "'Righteous', cursive",
+              fontSize: 24,
+              color: colors.noite,
+              marginBottom: 6,
+            }}
+          >
+            Pedido feito!
+          </p>
+          <p style={{ fontSize: 13, color: "#888", lineHeight: 1.7 }}>
+            Pagamento confirmado. O comércio foi notificado.
+          </p>
+        </div>
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 14,
+            border: `1px solid ${colors.bordaLilas}`,
+            padding: "14px 18px",
+            width: "100%",
+            maxWidth: 320,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 13, color: "#888" }}>
+              #{orderId?.slice(0, 8).toUpperCase()}
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: colors.rosa }}>
+              R$ {orderTotal.toFixed(2)}
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate("/orders")}
+          style={{
+            width: "100%",
+            maxWidth: 320,
+            padding: "13px",
+            borderRadius: 13,
+            background: colors.noite,
+            color: "#fff",
+            border: "none",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
+        >
+          📍 Acompanhar entrega
+        </button>
+        <button
+          onClick={() => navigate("/home")}
+          style={{
+            background: "none",
+            border: "none",
+            color: colors.rosa,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
+        >
+          Voltar para o início
+        </button>
+      </div>
+    );
+  }
+
+  // Sem state
+  if (!orderId) {
+    return (
+      <div
+        style={{
+          minHeight: "100dvh",
+          background: colors.fundo,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 16,
+          fontFamily: "'Space Grotesk', sans-serif",
+          padding: 24,
+        }}
+      >
+        <p style={{ fontSize: 14, color: "#aaa", textAlign: "center" }}>
+          Nenhum pedido em andamento.
+        </p>
+        <button
+          onClick={() => navigate("/home")}
+          style={{
+            padding: "11px 24px",
+            borderRadius: 12,
+            background: colors.rosa,
+            color: "#fff",
+            border: "none",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
+        >
+          Ir para o início
+        </button>
+      </div>
+    );
+  }
+
+  // Pagamento na entrega
+  const isEntrega =
+    paymentMethod === "dinheiro" ||
+    paymentMethod === "credito_ent" ||
+    paymentMethod === "debito_ent";
+  if (isEntrega && status !== "paid") {
+    const icons: Record<string, string> = {
+      dinheiro: "💵",
+      credito_ent: "💳",
+      debito_ent: "💳",
+    };
+    const labels: Record<string, string> = {
+      dinheiro: "Dinheiro",
+      credito_ent: "Cartão de crédito",
+      debito_ent: "Cartão de débito",
+    };
+    return (
+      <div
+        style={{
+          minHeight: "100dvh",
+          background: colors.fundo,
+          fontFamily: "'Space Grotesk', sans-serif",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          gap: 16,
+        }}
+      >
+        <div
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: "50%",
+            background: "#22c55e",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 32,
+          }}
+        >
+          {icons[paymentMethod]}
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <p
+            style={{
+              fontFamily: "'Righteous', cursive",
+              fontSize: 24,
+              color: colors.noite,
+              marginBottom: 6,
+            }}
+          >
+            Pedido confirmado!
+          </p>
+          <p style={{ fontSize: 13, color: "#888", lineHeight: 1.7 }}>
+            Pagamento via <strong>{labels[paymentMethod]}</strong> na entrega.
+            <br />O comércio irá preparar seu pedido.
+          </p>
+        </div>
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 13,
+            border: `1px solid ${colors.bordaLilas}`,
+            padding: "14px 18px",
+            width: "100%",
+            maxWidth: 360,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginBottom: 4,
+            }}
+          >
+            <span style={{ fontSize: 13, color: "#888" }}>
+              Total a pagar na entrega
+            </span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: colors.rosa }}>
+              R$ {orderTotal.toFixed(2)}
+            </span>
+          </div>
+          <p style={{ fontSize: 10, color: "#aaa" }}>
+            #{orderId?.slice(0, 8).toUpperCase()}
+          </p>
+        </div>
+        <div
+          style={{
+            background: "#f0fdf4",
+            border: "1px solid #86efac",
+            borderRadius: 12,
+            padding: "10px 14px",
+            width: "100%",
+            maxWidth: 360,
+          }}
+        >
+          <p style={{ fontSize: 11, color: "#15803d", lineHeight: 1.6 }}>
+            ✅ Tenha o valor exato em mãos ou seu cartão disponível para a
+            entrega.
+          </p>
+        </div>
+        <button
+          onClick={() => navigate(`/orders/${orderId}`)}
+          style={{
+            width: "100%",
+            maxWidth: 360,
+            padding: "13px",
+            borderRadius: 13,
+            background: colors.noite,
+            color: "#fff",
+            border: "none",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
+        >
+          📍 Acompanhar pedido →
+        </button>
+        <button
+          onClick={() => navigate("/home")}
+          style={{
+            background: "none",
+            border: "none",
+            color: colors.rosa,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
+        >
+          Voltar para o início
+        </button>
+      </div>
+    );
+  }
+
+  // QR Code
+  return (
+    <div
+      style={{
+        minHeight: "100dvh",
+        background: colors.fundo,
+        fontFamily: "'Space Grotesk', sans-serif",
+      }}
+    >
+      <div style={{ background: colors.noite }}>
+        <div
+          style={{ maxWidth: 520, margin: "0 auto", padding: "16px 20px 18px" }}
+        >
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255,255,255,0.35)",
+              fontSize: 13,
+              cursor: "pointer",
+              marginBottom: 10,
+              padding: 0,
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            ← Voltar
+          </button>
+          <p style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>
+            Pagamento
+          </p>
+          <p
+            style={{
+              fontSize: 11,
+              color: "rgba(255,255,255,0.4)",
+              marginTop: 2,
+            }}
+          >
+            Escaneie o QR Code para pagar via Pix
+          </p>
+        </div>
+      </div>
+      <div
+        style={{
+          maxWidth: 520,
+          margin: "0 auto",
+          width: "100%",
+          padding: "20px 16px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 16,
+        }}
+      >
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 16,
+            border: `1px solid ${colors.bordaLilas}`,
+            padding: "24px 20px",
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <p
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#aaa",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Total a pagar
+          </p>
+          <p
+            style={{
+              fontFamily: "'Righteous', cursive",
+              fontSize: 32,
+              color: colors.rosa,
+            }}
+          >
+            R$ {orderTotal.toFixed(2)}
+          </p>
+          <div
+            style={{
+              width: 200,
+              height: 200,
+              background: "#fff",
+              border: `3px solid ${colors.noite}`,
+              borderRadius: 12,
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {generating ? (
+              <Spinner color={colors.noite} size={32} />
+            ) : qrDataUrl ? (
+              <img
+                src={qrDataUrl}
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                alt="QR Code Pix"
+              />
+            ) : (
+              <Spinner color={colors.noite} size={24} />
+            )}
+          </div>
+          <p
+            style={{
+              fontSize: 11,
+              color: "#aaa",
+              textAlign: "center",
+              lineHeight: 1.6,
+            }}
+          >
+            Abra o app do banco e escaneie
+          </p>
+          {pixPayload && (
+            <button
+              onClick={() =>
+                navigator.clipboard
+                  .writeText(pixPayload)
+                  .then(() => alert("Código Pix copiado!"))
+              }
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: 10,
+                background: colors.lilasClaro,
+                border: "none",
+                color: "#7e22ce",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              📋 Copiar código Pix
+            </button>
+          )}
+        </div>
+        <div
+          style={{
+            background: "#fff8e6",
+            border: "1px solid #fcd34d",
+            borderRadius: 12,
+            padding: "12px 16px",
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <div
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "#f59e0b",
+              flexShrink: 0,
+              animation: "chegô-blink 1s ease-in-out infinite",
+            }}
+          />
+          <p style={{ fontSize: 12, color: "#92400e", fontWeight: 600 }}>
+            Aguardando confirmação do pagamento...
+          </p>
+        </div>
+        <style>{`@keyframes chegô-blink{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
+        <p style={{ fontSize: 11, color: "#aaa", textAlign: "center" }}>
+          O pedido será confirmado automaticamente após o pagamento
+        </p>
+        <button
+          onClick={() => navigate("/home")}
+          style={{
+            background: "none",
+            border: "none",
+            color: colors.rosa,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
+        >
+          Voltar para o início
+        </button>
+      </div>
     </div>
   );
 }
