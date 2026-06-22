@@ -52,6 +52,8 @@ export default function StoreProfileScreen() {
     zip_code: "",
     min_order_value: 0,
     delivery_fee: 0,
+    delivery_fee_mode: "fixed" as "fixed" | "per_km",
+    price_per_km: 0,
     estimated_time: 30,
   });
   const [showMap, setShowMap] = useState(false);
@@ -78,12 +80,25 @@ export default function StoreProfileScreen() {
       zip_code: store.zip_code ?? "",
       min_order_value: store.min_order_value ?? 0,
       delivery_fee: store.delivery_fee ?? 0,
+      delivery_fee_mode:
+        (store as any).delivery_fee_mode === "per_km" ? "per_km" : "fixed",
+      price_per_km: (store as any).price_per_km ?? 0,
       estimated_time: store.estimated_time ?? 30,
     });
     setEditing(true);
   }
 
   async function handleSave() {
+    // Se for cobrança por km, exige que a localização da loja já esteja definida,
+    // senão o cálculo de distância no carrinho do cliente não vai funcionar.
+    if (form.delivery_fee_mode === "per_km" && !store?.lat) {
+      showToast(
+        "Defina a localização da loja no mapa antes de usar cobrança por km",
+        "error",
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       await updateStore({
@@ -98,6 +113,8 @@ export default function StoreProfileScreen() {
         zip_code: form.zip_code.replace(/\D/g, ""),
         min_order_value: Number(form.min_order_value),
         delivery_fee: Number(form.delivery_fee),
+        delivery_fee_mode: form.delivery_fee_mode,
+        price_per_km: Number(form.price_per_km),
         estimated_time: Number(form.estimated_time),
       });
       setEditing(false);
@@ -148,6 +165,8 @@ export default function StoreProfileScreen() {
     );
 
   const initials = store?.name?.slice(0, 2).toUpperCase() ?? "??";
+  const currentMode =
+    (store as any)?.delivery_fee_mode === "per_km" ? "per_km" : "fixed";
 
   return (
     <div
@@ -311,8 +330,11 @@ export default function StoreProfileScreen() {
                 value: `R$ ${Number(store?.min_order_value ?? 0).toFixed(2)}`,
               },
               {
-                label: "Taxa de entrega",
-                value: `R$ ${Number(store?.delivery_fee ?? 0).toFixed(2)}`,
+                label: "Cobrança de entrega",
+                value:
+                  currentMode === "per_km"
+                    ? `R$ ${Number((store as any)?.price_per_km ?? 0).toFixed(2)} / km`
+                    : `R$ ${Number(store?.delivery_fee ?? 0).toFixed(2)} (fixo)`,
               },
               {
                 label: "Tempo estimado",
@@ -540,27 +562,142 @@ export default function StoreProfileScreen() {
             />
           </div>
 
-          <div style={{ display: "flex", gap: 10 }}>
-            <Input
-              label="Pedido mínimo (R$)"
-              type="number"
-              value={form.min_order_value}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  min_order_value: Number(e.target.value),
-                }))
-              }
-            />
-            <Input
-              label="Taxa entrega (R$)"
-              type="number"
-              value={form.delivery_fee}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, delivery_fee: Number(e.target.value) }))
-              }
-            />
+          <Input
+            label="Pedido mínimo (R$)"
+            type="number"
+            value={form.min_order_value}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                min_order_value: Number(e.target.value),
+              }))
+            }
+          />
+
+          {/* ── Cobrança de entrega: Fixo ou Por km ── */}
+          <div
+            style={{
+              background: colors.lilasClaro,
+              borderRadius: 13,
+              padding: "12px 14px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#7e22ce",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Cobrança de entrega
+            </p>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 8,
+              }}
+            >
+              {[
+                { id: "fixed", label: "Valor fixo", icon: "🏷️" },
+                { id: "per_km", label: "Por km rodado", icon: "📍" },
+              ].map((opt) => (
+                <div
+                  key={opt.id}
+                  onClick={() =>
+                    setForm((f) => ({
+                      ...f,
+                      delivery_fee_mode: opt.id as "fixed" | "per_km",
+                    }))
+                  }
+                  style={{
+                    padding: "10px 8px",
+                    borderRadius: 10,
+                    textAlign: "center",
+                    cursor: "pointer",
+                    border: `2px solid ${
+                      form.delivery_fee_mode === opt.id
+                        ? colors.rosa
+                        : colors.bordaLilas
+                    }`,
+                    background:
+                      form.delivery_fee_mode === opt.id ? "#fff" : "#fafafa",
+                  }}
+                >
+                  <div style={{ fontSize: 18, marginBottom: 4 }}>
+                    {opt.icon}
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: colors.noite,
+                    }}
+                  >
+                    {opt.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {form.delivery_fee_mode === "fixed" ? (
+              <Input
+                label="Taxa entrega (R$)"
+                type="number"
+                value={form.delivery_fee}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    delivery_fee: Number(e.target.value),
+                  }))
+                }
+              />
+            ) : (
+              <>
+                <Input
+                  label="Valor por km (R$)"
+                  type="number"
+                  step="0.01"
+                  value={form.price_per_km}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      price_per_km: Number(e.target.value),
+                    }))
+                  }
+                  placeholder="Ex: 1.50"
+                />
+                {!store?.lat && (
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: "#b45309",
+                      lineHeight: 1.5,
+                      background: "#fff8e6",
+                      border: "1px solid #fcd34d",
+                      borderRadius: 8,
+                      padding: "8px 10px",
+                    }}
+                  >
+                    ⚠️ Marque a localização da loja no mapa (mais abaixo) antes
+                    de salvar — é necessário para calcular a distância até o
+                    cliente.
+                  </p>
+                )}
+                <p style={{ fontSize: 11, color: "#888", lineHeight: 1.5 }}>
+                  A taxa será calculada automaticamente: distância da loja até o
+                  endereço do cliente × valor por km.
+                </p>
+              </>
+            )}
           </div>
+
           <Input
             label="Tempo estimado (min)"
             type="number"

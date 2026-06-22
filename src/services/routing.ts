@@ -29,7 +29,7 @@ export interface OptimizationResult {
   total_duration_min: number;
 }
 
-const OSRM_BASE = "https://routing.openstreetmap.de/routed-car";
+const OSRM_BASE = "https://router.project-osrm.org";
 
 // Geocodificação via ViaCEP + Nominatim (ambos permitem CORS do browser)
 export async function geocodeAddress(input: {
@@ -38,7 +38,6 @@ export async function geocodeAddress(input: {
   state: string;
   zip_code: string;
 }): Promise<{ lat: number; lng: number } | null> {
-
   const cep = input.zip_code.replace(/\D/g, "");
 
   let cidade = input.city;
@@ -70,7 +69,6 @@ export async function geocodeAddress(input: {
       if (r.ok) {
         const d = await r.json();
         if (d?.length > 0) {
-         
           return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
         }
       }
@@ -83,6 +81,36 @@ export async function geocodeAddress(input: {
   return null;
 }
 
+// ── NOVO: distância ponto-a-ponto (loja → cliente) para cálculo de taxa ──
+// Usa rota real do OSRM (mais precisa que linha reta); cai para Haversine se a API falhar.
+export async function getDistanceKm(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+): Promise<number> {
+  try {
+    const coords = `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`;
+    const url = `${OSRM_BASE}/route/v1/driving/${coords}?overview=false`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.code === "Ok" && data.routes?.length) {
+      const meters = data.routes[0].distance ?? 0;
+      return Math.round((meters / 1000) * 10) / 10; // 1 casa decimal
+    }
+  } catch (e) {
+    console.warn("OSRM route falhou, usando Haversine:", e);
+  }
+
+  // Fallback: linha reta
+  const km = haversineKm(
+    origin.lat,
+    origin.lng,
+    destination.lat,
+    destination.lng,
+  );
+  return Math.round(km * 10) / 10;
+}
+
 // Otimiza a ordem das paradas usando OSRM Trip (Traveling Salesman)
 export async function optimizeRoute(
   origin: { lat: number; lng: number },
@@ -92,38 +120,8 @@ export async function optimizeRoute(
     return { stops: [], total_distance_km: 0, total_duration_min: 0 };
   }
 
-  // Para 1 ou mais paradas, usa OSRM para distância real por estrada
-  // (não usa haversine pois gera distância em linha reta incorreta)
-
-  // Para 1 parada usa /route (mais simples e confiável)
+  // Se só 1 parada, não precisa otimizar
   if (waypoints.length === 1) {
-    try {
-      const wp = waypoints[0];
-      const coords = `${origin.lng},${origin.lat};${wp.lng},${wp.lat}`;
-      const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false`;
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (data.code === "Ok" && data.routes?.length) {
-        const route = data.routes[0];
-        const distKm = Math.round((route.distance / 1000) * 10) / 10;
-        const durMin = Math.ceil(route.duration / 60);
-        return {
-          stops: [
-            {
-              ...wp,
-              stop_number: 1,
-              distance_km: distKm,
-              duration_min: durMin,
-              delivered_at: null,
-            },
-          ],
-          total_distance_km: distKm,
-          total_duration_min: durMin,
-        };
-      }
-    } catch (_) {}
-    // fallback haversine só se OSRM falhar
     const wp = waypoints[0];
     const dist = haversineKm(origin.lat, origin.lng, wp.lat, wp.lng);
     return {
@@ -132,7 +130,7 @@ export async function optimizeRoute(
           ...wp,
           stop_number: 1,
           distance_km: Math.round(dist * 10) / 10,
-          duration_min: Math.ceil(dist * 3),
+          duration_min: Math.ceil(dist * 3), // ~20km/h média urbana
           delivered_at: null,
         },
       ],
@@ -148,7 +146,7 @@ export async function optimizeRoute(
       ...waypoints.map((w) => `${w.lng},${w.lat}`),
     ].join(";");
 
-    const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&roundtrip=false&annotations=false&steps=false`;
+    const url = `${OSRM_BASE}/trip/v1/driving/${coords}?source=first&roundtrip=false&annotations=false&steps=false`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -247,7 +245,8 @@ function fallbackOptimize(
 }
 
 // Distância em km entre dois pontos (fórmula de Haversine)
-function haversineKm(
+// Exportada para reuso em outros lugares (ex: cálculo de taxa de entrega)
+export function haversineKm(
   lat1: number,
   lng1: number,
   lat2: number,
