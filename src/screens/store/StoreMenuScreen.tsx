@@ -158,7 +158,7 @@ export default function StoreMenuScreen() {
             store_name: store?.name,
             items,
             price,
-            image_url: imageUrl,
+            media: imageUrl,
             available_date: form.available_date,
           }),
         },

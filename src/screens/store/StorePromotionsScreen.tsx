@@ -585,7 +585,7 @@ export default function StorePromotionsScreen() {
             <Spinner color={colors.rosa} />
             <p
               style={{
-                fontSize: 14,
+                
                 fontWeight: 700,
                 color: colors.noite,
                 marginTop: 12,
