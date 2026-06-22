@@ -33,6 +33,17 @@ function sanitize(str: string, maxLen: number): string {
     .slice(0, maxLen);
 }
 
+// Gera uma "assinatura" do carrinho (produto:quantidade, ordenado) para
+// comparar se dois pedidos têm exatamente os mesmos itens.
+function buildItemsSignature(
+  items: { product_id: string; quantity: number }[],
+): string {
+  return items
+    .map((i) => `${i.product_id}:${i.quantity}`)
+    .sort()
+    .join("|");
+}
+
 // ── CARRINHO ──────────────────────────────────────────────
 export function CartScreen() {
   const navigate = useNavigate();
@@ -174,6 +185,50 @@ export function CartScreen() {
   const orderDeliveryFee = deliveryType === "pickup" ? 0 : deliveryFee;
   const orderTotal = total + orderDeliveryFee;
 
+  // ── Blindagem: verifica se um pedido idêntico (mesmos itens e
+  // quantidades, mesma loja) foi feito pelo mesmo cliente nos últimos 5min ──
+  async function checkDuplicateOrder(): Promise<boolean> {
+    if (!user || !storeId) return false;
+
+    const cartSignature = buildItemsSignature(
+      items.map((i) => ({
+        product_id: i.product_id,
+        quantity: i.quantity,
+      })),
+    );
+    if (!cartSignature) return false;
+
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+    const { data: recentOrders } = await supabase
+      .from("orders")
+      .select("id, order_items(product_id, quantity)")
+      .eq("store_id", storeId)
+      .eq("customer_id", user.id)
+      .neq("status", "cancelled")
+      .gte("created_at", fiveMinAgo);
+
+    const isDuplicate = (recentOrders ?? []).some((o: any) => {
+      const sig = buildItemsSignature(o.order_items ?? []);
+      return sig === cartSignature;
+    });
+
+    if (!isDuplicate) return false;
+
+    const { isConfirmed } = await Swal.fire({
+      icon: "warning",
+      title: "Pedido repetido?",
+      html: "Você já fez um pedido com os mesmos itens nos últimos 5 minutos.<br/>Tem certeza que quer fazer esse pedido de novo?",
+      showCancelButton: true,
+      confirmButtonText: "Sim, fazer de novo",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: colors.rosa,
+    });
+
+    // Retorna true se deve BLOQUEAR (ou seja, usuário NÃO confirmou)
+    return !isConfirmed;
+  }
+
   async function handleCheckout() {
     if (!user || !storeId) return;
     if (deliveryType === "delivery" && (!selectedAddr || !address)) {
@@ -191,6 +246,13 @@ export function CartScreen() {
     if (submitting) return;
     setSubmitting(true);
     try {
+      // Verifica pedido duplicado ANTES de qualquer outra coisa
+      const blocked = await checkDuplicateOrder();
+      if (blocked) {
+        setSubmitting(false);
+        return;
+      }
+
       const { data: store } = await supabase
         .from("stores")
         .select("min_order_value, city")
